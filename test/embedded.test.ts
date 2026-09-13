@@ -49,6 +49,33 @@ describe("EmbeddedContextManager", () => {
     expect(host.onStatus).toHaveBeenCalled();
   });
 
+  it("uses the effective prefill budget for proactive thresholds while retaining the logical window", async () => {
+    const host = createMockHost({
+      getContextUsage: vi.fn().mockReturnValue({
+        tokens: 28_000,
+        contextWindow: 131_072,
+        logicalContextWindow: 131_072,
+        effectiveContextBudget: 48_000,
+        source: "reported",
+      }),
+    });
+    const manager = createEmbeddedContextManager(host, {
+      contextWindow: 131_072,
+      logicalContextWindow: 131_072,
+      effectivePrefillBudget: 48_000,
+    });
+
+    const snapshot = manager.snapshot();
+    expect(snapshot.logicalContextWindow).toBe(131_072);
+    expect(snapshot.contextWindow).toBe(131_072);
+    expect(snapshot.effectiveContextBudget).toBe(48_000);
+    // Balanced compact threshold is reduced from 32k to half of the 48k
+    // operational budget, so 28k crosses it; the logical 131k window would not.
+    expect(snapshot.compactThresholdTokens).toBe(24_000);
+    await manager.observeSettled();
+    expect(host.compact).toHaveBeenCalledTimes(1);
+  });
+
   it("falls back to character estimation from entries when host token usage is absent", () => {
     const host = createMockHost({
       getContextUsage: vi.fn().mockReturnValue(null),
