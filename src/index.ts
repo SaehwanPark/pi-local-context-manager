@@ -71,7 +71,7 @@ import {
   type FabricObservation,
 } from "./embedded/index.js";
 
-const EXTENSION_STATUS_KEY = "local-context-manager";
+const EXTENSION_STATUS_KEY = "pi-local-context-manager";
 const SEMANTIC_COMPACTION_INSTRUCTIONS =
   "A meaningful task phase has completed. Preserve exact paths, decisions, verification, unresolved issues, and the next independent phase; do not preserve conversational filler.";
 const SEMANTIC_PARAMETERS = Type.Object({
@@ -101,9 +101,9 @@ function debugLog(config: LocalContextManagerConfig, message: string, error?: un
     return;
   }
   if (error === undefined) {
-    console.error(`[local-context-manager] ${message}`);
+    console.error(`[pi-local-context-manager] ${message}`);
   } else {
-    console.error(`[local-context-manager] ${message}`, error);
+    console.error(`[pi-local-context-manager] ${message}`, error);
   }
 }
 
@@ -217,7 +217,7 @@ function notifySoftWarning(
   warned.value = true;
   if (context.hasUI) {
     context.ui.notify(
-      `Context is approaching the local-context-manager threshold (${Math.round(tokens).toLocaleString()} tokens).`,
+      `Context is approaching the pi-local-context-manager threshold (${Math.round(tokens).toLocaleString()} tokens).`,
       "warning",
     );
   }
@@ -403,7 +403,7 @@ function interopRegistrationProblem(): string | undefined {
   const status = getInteropStatus();
   return status.shared
     ? `${LCM_EMBEDDED_CONTEXT_PROVIDER_NAME} was already registered by another module instance, so that provider stays in place for this process`
-    : `the extension interop registry v${status.publishedVersion} is not understood by local-context-manager, so its providers are invisible to each other`;
+    : `the extension interop registry v${status.publishedVersion} is not understood by pi-local-context-manager, so its providers are invisible to each other`;
 }
 
 export default function (pi: ExtensionAPI): void {
@@ -586,8 +586,10 @@ export default function (pi: ExtensionAPI): void {
     }
     pathSettings = paths;
     const loaded = await loadConfig({
-      globalConfigPath: join(paths.agentDir, "local-context-manager.json"),
-      projectConfigPath: join(context.cwd, paths.configDirName, "local-context-manager.json"),
+      globalConfigPath: join(paths.agentDir, "pi-local-context-manager.json"),
+      fallbackGlobalConfigPath: join(paths.agentDir, "local-context-manager.json"),
+      projectConfigPath: join(context.cwd, paths.configDirName, "pi-local-context-manager.json"),
+      fallbackProjectConfigPath: join(context.cwd, paths.configDirName, "local-context-manager.json"),
       allowProjectConfig: context.isProjectTrusted(),
     });
     if (generation !== sessionGeneration) {
@@ -658,7 +660,7 @@ export default function (pi: ExtensionAPI): void {
       const message = loaded.errors.join("; ");
       debugLog(config, message);
       if (context.hasUI) {
-        context.ui.notify(`local-context-manager configuration warning: ${message}`, "warning");
+        context.ui.notify(`pi-local-context-manager configuration warning: ${message}`, "warning");
       }
     }
 
@@ -668,7 +670,7 @@ export default function (pi: ExtensionAPI): void {
     const interopProblem = interopRegistrationProblem();
     if (interopProblem) {
       debugLog(config, `interop registration: ${interopProblem}`);
-      notifyUI(context, config, `local-context-manager integration warning: ${interopProblem}`, "warning");
+      notifyUI(context, config, `pi-local-context-manager integration warning: ${interopProblem}`, "warning");
     }
   });
 
@@ -883,7 +885,7 @@ export default function (pi: ExtensionAPI): void {
     notifyUI(
       context,
       config,
-      `local-context-manager compaction did not complete: ${event.errorMessage ?? "cancelled"}.${retryMessage}`,
+      `pi-local-context-manager compaction did not complete: ${event.errorMessage ?? "cancelled"}.${retryMessage}`,
       "warning",
     );
     debugLog(config, `compaction failed (${event.reason})`, event.errorMessage);
@@ -1061,8 +1063,8 @@ export default function (pi: ExtensionAPI): void {
 
   const contextModeSummary = (): string =>
     profileOverride
-      ? `${config.contextProfile} (session override; /context-mode reset restores local-context-manager.json)`
-      : `${config.contextProfile} (local-context-manager.json)`;
+      ? `${config.contextProfile} (session override; /context-mode reset restores pi-local-context-manager.json)`
+      : `${config.contextProfile} (pi-local-context-manager.json)`;
 
   const reportContextStats = async (_args: string, context: ExtensionCommandContext) => {
     const observed = observeContext(context, config, telemetry, gate);
@@ -1173,7 +1175,7 @@ export default function (pi: ExtensionAPI): void {
 
       if (requested === "reset" || requested === "config") {
         if (profileOverride === undefined) {
-          const message = `No session override is active; thresholds already come from local-context-manager.json (${config.contextProfile}).`;
+          const message = `No session override is active; thresholds already come from pi-local-context-manager.json (${config.contextProfile}).`;
           if (context.hasUI) {
             context.ui.notify(message, "info");
           } else {
@@ -1221,8 +1223,8 @@ export default function (pi: ExtensionAPI): void {
         `Context mode set to ${profile} for this session.`,
         `Effective thresholds: ${formatThresholdSummary(observed.thresholds)}`,
         `Context window: ${snapshot.contextWindow === null ? "not reported" : `${Math.round(snapshot.contextWindow).toLocaleString()} tokens`}`,
-        "Thresholds you set in local-context-manager.json are replaced for this session; /context-mode reset restores them.",
-        `To make it persistent, set \"contextProfile\": \"${profile}\" in local-context-manager.json.`,
+        "Thresholds you set in pi-local-context-manager.json are replaced for this session; /context-mode reset restores them.",
+        `To make it persistent, set \"contextProfile\": \"${profile}\" in pi-local-context-manager.json.`,
       ].join("\n");
       if (context.hasUI) {
         context.ui.notify(details, "info");

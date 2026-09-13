@@ -1,14 +1,12 @@
-# local-context-manager: Integration Hardening Implementation Plan
+# pi-local-context-manager: Integration Hardening Implementation Plan
 
-Repository: `SaehwanPark/local-context-manager`  
-Target branch baseline: current `main` audited 2026-09-08  
-Primary companion: `SaehwanPark/pi-safe-agent-team`  
-Expected always-on root extensions: `pi-mono-context-guard`, `pi-computer-use`, `pi-web-access`, `pi-chrome`, `pi-mcp-adapter`, `@narumitw/pi-goal`, and `pi-safe-agent-team`  
-Expected models: OpenAI Codex subscription models (GPT-5.6 Luna/Sol, GPT-6 Astra) and local Qwen 3.8 Flash Next / Qwen 3.8-27B.
+Repository: `SaehwanPark/pi-local-context-manager`  
+Primary focus: Fabric-aware semantic compaction/reset, embeddable context management, and evidence completeness provenance  
+Status: Drafted from audit findings  
 
-## 1. Purpose
+## Goal
 
-Harden `local-context-manager` for long-running, multi-agent Pi development without weakening its current conservative behavior.
+Harden `pi-local-context-manager` for long-running, multi-agent Pi development without weakening its current conservative behavior.
 
 The implementation must solve four integration problems:
 

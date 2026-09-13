@@ -25,7 +25,8 @@ import {
   type FabricStateSnapshotV1,
 } from "./embedded/interop.js";
 
-export const CHECKPOINT_RESET_ENTRY_TYPE = "local-context-manager-checkpoint-reset";
+export const CHECKPOINT_RESET_ENTRY_TYPE = "pi-local-context-manager-checkpoint-reset";
+export const LEGACY_CHECKPOINT_RESET_ENTRY_TYPE = "local-context-manager-checkpoint-reset";
 export const MAX_CHECKPOINT_INPUT_CHARS = 120_000;
 export const MAX_CHECKPOINT_CHARS = 32_000;
 export const MAX_CAPSULE_CHARS = 8_000;
@@ -218,7 +219,7 @@ export function resolveCheckpointDirectory(
   agentDir: string,
 ): string {
   if (config.checkpointDirectory === null) {
-    return join(agentDir, "local-context-manager", "checkpoints");
+    return join(agentDir, "pi-local-context-manager", "checkpoints");
   }
 
   const configured = config.checkpointDirectory.trim();
@@ -663,7 +664,12 @@ export function getLatestCheckpointResetRecord(
 ): CheckpointResetRecord | undefined {
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index];
-    if (entry.type !== "custom" || entry.customType !== CHECKPOINT_RESET_ENTRY_TYPE || !isRecord(entry.data)) {
+    if (
+      entry.type !== "custom" ||
+      (entry.customType !== CHECKPOINT_RESET_ENTRY_TYPE &&
+        entry.customType !== LEGACY_CHECKPOINT_RESET_ENTRY_TYPE) ||
+      !isRecord(entry.data)
+    ) {
       continue;
     }
     const count = entry.data.count;

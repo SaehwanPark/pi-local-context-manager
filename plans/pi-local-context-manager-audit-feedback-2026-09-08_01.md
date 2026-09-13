@@ -1,6 +1,6 @@
-# Audit Feedback: `local-context-manager`
+# Audit Feedback: `pi-local-context-manager`
 
-**Repository:** `SaehwanPark/local-context-manager`  
+**Repository:** `SaehwanPark/pi-local-context-manager`  
 **Audited branch:** `main`  
 **Audited HEAD:** `374e9fbc7f05b121090e57d54b9319ff05edcd56`  
 **Audit date:** 2026-09-08  

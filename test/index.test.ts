@@ -182,7 +182,7 @@ describe("extension integration", () => {
     } as unknown as ExtensionCommandContext;
 
     await statsCommand?.("", mockContext);
-    expect(notifyMessage).toContain("Context mode: balanced (local-context-manager.json)");
+    expect(notifyMessage).toContain("Context mode: balanced (pi-local-context-manager.json)");
     expect(notifyMessage).toContain("Recovery copies pruned: 0");
 
     const modeCommand = harness.commands.get("context-mode")?.handler;
@@ -190,7 +190,7 @@ describe("extension integration", () => {
 
     await statsCommand?.("", mockContext);
     expect(notifyMessage).toContain(
-      "Context mode: aggressive (session override; /context-mode reset restores local-context-manager.json)",
+      "Context mode: aggressive (session override; /context-mode reset restores pi-local-context-manager.json)",
     );
   });
 

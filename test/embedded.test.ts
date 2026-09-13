@@ -191,7 +191,7 @@ describe("EmbeddedContextManager", () => {
     await expect(manager.observeSettled()).resolves.not.toThrow();
   });
 
-  it("can be registered and created through the interop provider", () => {
+  it("can be registered and created through the interop provider (primary and legacy names)", () => {
     registerEmbeddedContextManagerProvider();
 
     const provider = getInteropProvider<{
@@ -200,6 +200,12 @@ describe("EmbeddedContextManager", () => {
 
     expect(provider).toBeDefined();
     expect(typeof provider?.createEmbeddedContextManager).toBe("function");
+
+    const legacyProvider = getInteropProvider<{
+      createEmbeddedContextManager: typeof createEmbeddedContextManager;
+    }>("local-context-manager.embedded-context.v1");
+    expect(legacyProvider).toBeDefined();
+    expect(typeof legacyProvider?.createEmbeddedContextManager).toBe("function");
 
     const host = createMockHost();
     const manager = provider!.createEmbeddedContextManager(host, { contextWindow: 128_000 });

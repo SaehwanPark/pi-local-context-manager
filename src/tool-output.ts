@@ -456,7 +456,7 @@ function compactedHeader(
   const hint = isError ? guessStatusCodeFromOutput(originalText) : undefined;
   const label = category === "failure" ? "failed command" : `${category} output`;
   const metadata = [
-    `[local-context-manager] Reduced ${label}.`,
+    `[pi-local-context-manager] Reduced ${label}.`,
     command ? `Command: ${clipCommand(command)}` : undefined,
     `Exit status: ${describeExitStatus(isError)}`,
     hint
@@ -737,7 +737,7 @@ export function appendPrunedOutputNotice(
     return [...content];
   }
   const textIndex = content.findIndex((block) => block.type === "text");
-  const note = `The local-context-manager recovery copy at ${paths.join(", ")} was pruned by this session; the full output is no longer available. Re-run the command if the complete output is required.`;
+  const note = `The pi-local-context-manager recovery copy at ${paths.join(", ")} was pruned by this session; the full output is no longer available. Re-run the command if the complete output is required.`;
   if (textIndex < 0) {
     return [...content, { type: "text", text: note }];
   }

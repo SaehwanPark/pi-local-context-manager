@@ -4,11 +4,11 @@ The result is materially better: **the previous P0 integration blockers are reso
 
 | Project | Current HEAD | Assessment |
 |---|---|---|
-| `local-context-manager` | `5377b743…` / v0.4.2 | **Strong; previous P0s fixed** |
-| `pi-safe-agent-team` | `cff14f2f…` | **Strong; previous P1/P2 fixes landed** |
+| `pi-local-context-manager` | `5377b743…` / v0.4.2 | **Strong; previous P0s fixed** |
+| `pi-safe-agent-team` | `26b38c2a…` / v0.2.1 | **High risk in multi-agent runtimes** |
 | Joint architecture | — | **Fundamentally sound; a few P1s remain** |
 
-## `local-context-manager`: this repository
+## `pi-local-context-manager`: this repository
 
 The second-round fixes are real rather than just documented.
 

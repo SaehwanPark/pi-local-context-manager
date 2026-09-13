@@ -1,29 +1,29 @@
 ---
 title: Releases & distribution
-description: Release history and installation links for local-context-manager.
+description: Release history and installation links for pi-local-context-manager.
 ---
 
 # Releases & distribution
 
-[Documentation portal]({{ '/' | relative_url }}) · [Installation & first launch]({{ '/guides/installation.html' | relative_url }}) · [GitHub changelog](https://github.com/SaehwanPark/local-context-manager/blob/main/CHANGELOG.md)
+[Documentation portal]({{ '/' | relative_url }}) · [Installation & first launch]({{ '/guides/installation.html' | relative_url }}) · [GitHub changelog](https://github.com/SaehwanPark/pi-local-context-manager/blob/main/CHANGELOG.md)
 
-The current source release is **`{{ site.version }}`**. GitHub and the Pages site document v0.5.0. While npm package deployment is pending trusted-publishing configuration, installing directly from GitHub via `git:...` is recommended by default.
+The current source release is **`{{ site.version }}`**. GitHub and the Pages site document v0.5.1. While npm package deployment is pending trusted-publishing configuration, installing directly from GitHub via `git:...` is recommended by default.
 
 ## Install the current release
 
 Install directly from GitHub:
 
 ```bash
-pi install git:github.com/SaehwanPark/local-context-manager
+pi install git:github.com/SaehwanPark/pi-local-context-manager
 ```
 
-To pin a specific release version (for example `v0.5.0`):
+To pin a specific release version (for example `v0.5.1`):
 
 ```bash
-pi install git:github.com/SaehwanPark/local-context-manager#v0.5.0
+pi install git:github.com/SaehwanPark/pi-local-context-manager#v0.5.1
 ```
 
-- [GitHub repository](https://github.com/SaehwanPark/local-context-manager)
+- [GitHub repository](https://github.com/SaehwanPark/pi-local-context-manager)
 - [Beginner installation guide]({{ '/guides/installation.html' | relative_url }})
 - [npm package](https://www.npmjs.com/package/local-context-manager) *(npm serves v0.3.1 until trusted publishing is active)*
 
@@ -31,6 +31,7 @@ pi install git:github.com/SaehwanPark/local-context-manager#v0.5.0
 
 | Version | Milestone | Highlights |
 | --- | --- | --- |
+| **0.5.1** | Rebrand to pi-local-context-manager | Project rebranded to `pi-local-context-manager` across directory, repository, and documentation to align with companion Pi ecosystem projects. |
 | **0.5.0** | Comprehensive resilience hardening (R1-R3 audit) | Over-threshold compaction hysteresis, session-addressable manifest recovery with lease refresh, lazy interop querying with AbortSignal cancellation, correlated semantic compaction, and safe tool-output recovery. |
 | **0.4.3** | Joint audit hardening | Provider-owned quiescence, recovery-safe embedded deactivation, strict snapshot validation, and session-scoped safe-agent fabrics. |
 | **0.4.2** | Cross-project V1 interoperability | Fail-closed fabric state handling, isolated embedded recovery, coordinated reset safety, and portable smoke coverage. |
@@ -45,10 +46,10 @@ pi install git:github.com/SaehwanPark/local-context-manager#v0.5.0
 | **0.3.2** | Nonfatal compaction recovery | Native cut-point preflight, async failure recovery/backoff, and lifecycle-safe callbacks. |
 | **0.3.1** | Adaptive context profiles | Balanced/aggressive/relaxed profiles, constrained-window adaptation, and effective threshold reporting. |
 | **0.3.0** | Public distribution and documentation | GitHub Pages portal, npm metadata and publication, CI/package checks, and beginner-first user guidance. |
-| **0.2.0** | [PR #2](https://github.com/SaehwanPark/local-context-manager/pull/2) | Reviewed checkpoint reset, durable local archives, continuation capsules, reset recommendations, listing, and lineage telemetry. |
-| **0.1.0** | [PR #1](https://github.com/SaehwanPark/local-context-manager/pull/1) | Initial extension: telemetry, guarded compaction, tool-output reduction, semantic phase compaction, and reviewed handoff. |
+| **0.2.0** | [PR #2](https://github.com/SaehwanPark/pi-local-context-manager/pull/2) | Reviewed checkpoint reset, durable local archives, continuation capsules, reset recommendations, listing, and lineage telemetry. |
+| **0.1.0** | [PR #1](https://github.com/SaehwanPark/pi-local-context-manager/pull/1) | Initial extension: telemetry, guarded compaction, tool-output reduction, semantic phase compaction, and reviewed handoff. |
 
-For the complete categorized history, read the [root `CHANGELOG.md`](https://github.com/SaehwanPark/local-context-manager/blob/main/CHANGELOG.md).
+For the complete categorized history, read the [root `CHANGELOG.md`](https://github.com/SaehwanPark/pi-local-context-manager/blob/main/CHANGELOG.md).
 
 ## Release boundaries
 
@@ -65,4 +66,4 @@ npm pack --dry-run
 
 Published GitHub releases now run `.github/workflows/release.yml`, which verifies that the tag matches `package.json` and publishes through npm trusted publishing. The npm package's one-time trusted-publisher setting must point to this repository and workflow; no long-lived npm token is stored in GitHub. The GitHub Pages workflow deploys documentation from `main`.
 
-When upgrading, restart Pi or use `/reload`. If you need to preserve a reproducible setup, use the pinned `git:github.com/SaehwanPark/local-context-manager#<version>` form and keep the version in your project notes.
+When upgrading, restart Pi or use `/reload`. If you need to preserve a reproducible setup, use the pinned `git:github.com/SaehwanPark/pi-local-context-manager#<version>` form and keep the version in your project notes.

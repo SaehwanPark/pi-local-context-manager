@@ -42,8 +42,8 @@ import {
 import { DEFAULT_CONFIG } from "../src/config.js";
 
 const repositoryState: RepositoryState = {
-  workingDirectory: "/work/local-context-manager",
-  repositoryRoot: "/work/local-context-manager",
+  workingDirectory: "/work/pi-local-context-manager",
+  repositoryRoot: "/work/pi-local-context-manager",
   branch: "feat/checkpoint-reset",
   head: "0123456789abcdef",
   workingTree: "dirty",
@@ -54,7 +54,7 @@ const input: CheckpointResetInput = {
   reason: "PR #123 merged",
   repositoryState,
   parentSession: "/home/test/.pi/agent/sessions/parent.jsonl",
-  checkpointPath: "/home/test/.pi/agent/local-context-manager/checkpoints/repo-test/2026-checkpoint.md",
+  checkpointPath: "/home/test/.pi/agent/pi-local-context-manager/checkpoints/repo-test/2026-checkpoint.md",
   conversationText: "The completed implementation changed src/index.ts and passed npm test.",
 };
 
@@ -150,15 +150,15 @@ describe("checkpoint reset artifacts", () => {
 
 describe("checkpoint storage", () => {
   it("uses a hashed repository directory and restrictive atomic files", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "local-context-manager-checkpoint-test-"));
+    const directory = await mkdtemp(join(tmpdir(), "pi-local-context-manager-checkpoint-test-"));
     try {
       const state = { ...repositoryState, repositoryRoot: "/private/repository/path" };
       const storage = getCheckpointStorageDirectory(DEFAULT_CONFIG, directory, state);
-      expect(storage).toContain(join(directory, "local-context-manager", "checkpoints"));
+      expect(storage).toContain(join(directory, "pi-local-context-manager", "checkpoints"));
       expect(storage).not.toContain("/private/repository/path");
       expect(repositoryIdentifier(state)).toMatch(/^repo-[a-f0-9]{16}$/);
       expect(resolveCheckpointDirectory(DEFAULT_CONFIG, directory)).toContain(
-        join(directory, "local-context-manager", "checkpoints"),
+        join(directory, "pi-local-context-manager", "checkpoints"),
       );
 
       const path = await chooseCheckpointPath(storage, input.createdAt, "PR #123 merged / unsafe");
@@ -184,7 +184,7 @@ describe("checkpoint storage", () => {
   });
 
   it("does not replace an existing checkpoint", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "local-context-manager-checkpoint-test-"));
+    const directory = await mkdtemp(join(tmpdir(), "pi-local-context-manager-checkpoint-test-"));
     try {
       const path = join(directory, "existing.md");
       await writeCheckpointAtomically(path, "first");
@@ -196,7 +196,7 @@ describe("checkpoint storage", () => {
   });
 
   it("does not clobber when two writers publish the same checkpoint concurrently", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "local-context-manager-checkpoint-test-"));
+    const directory = await mkdtemp(join(tmpdir(), "pi-local-context-manager-checkpoint-test-"));
     try {
       const path = join(directory, "concurrent.md");
       const results = await Promise.allSettled([
@@ -231,7 +231,7 @@ describe("checkpoint storage", () => {
   });
 
   it("falls back to atomic exclusive file creation when hard links are unsupported (e.g. EXDEV)", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "local-context-manager-checkpoint-test-"));
+    const directory = await mkdtemp(join(tmpdir(), "pi-local-context-manager-checkpoint-test-"));
     const mockLink = vi.fn().mockRejectedValue(
       Object.assign(new Error("cross-device link not permitted"), { code: "EXDEV" }),
     );
@@ -249,7 +249,7 @@ describe("checkpoint storage", () => {
   });
 
   it("cleans up partial file when fallback write fails", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "local-context-manager-checkpoint-fail-"));
+    const directory = await mkdtemp(join(tmpdir(), "pi-local-context-manager-checkpoint-fail-"));
     const mockLink = vi.fn().mockRejectedValue(
       Object.assign(new Error("cross-device link not permitted"), { code: "EXDEV" }),
     );
@@ -291,9 +291,15 @@ describe("repository metadata and reset records", () => {
     const record = makeCheckpointResetRecord(input, 3);
     const entries = [
       { type: "custom", customType: "other", data: {} },
-      { type: "custom", customType: "local-context-manager-checkpoint-reset", data: record },
+      { type: "custom", customType: "pi-local-context-manager-checkpoint-reset", data: record },
     ] as never;
     expect(getLatestCheckpointResetRecord(entries)).toEqual(record);
+
+    // Legacy entry type support
+    const legacyEntries = [
+      { type: "custom", customType: "local-context-manager-checkpoint-reset", data: record },
+    ] as never;
+    expect(getLatestCheckpointResetRecord(legacyEntries)).toEqual(record);
   });
 });
 
@@ -372,7 +378,7 @@ function makeResetContext(
 
 describe("reset transaction", () => {
   it("writes before starting a parent-linked fresh session and prepares the capsule", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "local-context-manager-reset-test-"));
+    const directory = await mkdtemp(join(tmpdir(), "pi-local-context-manager-reset-test-"));
     try {
       const context = makeResetContext(directory);
       await runCheckpointReset("PR #123 merged", context, {
@@ -406,7 +412,7 @@ describe("reset transaction", () => {
   });
 
   it("preserves the saved checkpoint when fresh-session creation fails", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "local-context-manager-reset-test-"));
+    const directory = await mkdtemp(join(tmpdir(), "pi-local-context-manager-reset-test-"));
     try {
       const context = makeResetContext(directory, {}, "throw");
       await runCheckpointReset("completed milestone", context, {
@@ -429,7 +435,7 @@ describe("reset transaction", () => {
   });
 
   it("does not write or switch when the user declines", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "local-context-manager-reset-test-"));
+    const directory = await mkdtemp(join(tmpdir(), "pi-local-context-manager-reset-test-"));
     try {
       const context = makeResetContext(directory, {
         confirm: vi.fn(async () => false),

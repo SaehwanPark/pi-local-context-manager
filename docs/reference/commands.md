@@ -1,6 +1,6 @@
 ---
 title: Command reference
-description: Slash commands and model-facing tools provided by local-context-manager.
+description: Slash commands and model-facing tools provided by pi-local-context-manager.
 ---
 
 # Command reference
@@ -43,7 +43,7 @@ Return to the default or allow longer working contexts:
 /context-mode relaxed
 ```
 
-To persist a choice across sessions, set `contextProfile` in `local-context-manager.json`; see [Configuration]({{ '/reference/configuration.html' | relative_url }}).
+To persist a choice across sessions, set `contextProfile` in `pi-local-context-manager.json`; see [Configuration]({{ '/reference/configuration.html' | relative_url }}).
 
 Mark the end of a phase:
 

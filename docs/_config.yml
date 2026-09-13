@@ -1,8 +1,8 @@
-title: "Local Context Manager"
+title: "pi-local-context-manager"
 tagline: "Keep long Pi sessions usable"
-description: "Beginner-friendly guides for local-context-manager, a Pi extension for cache-friendly context control in long-running sessions."
-version: "0.5.0"
-baseurl: "/local-context-manager"
+description: "Beginner-friendly guides for pi-local-context-manager, a Pi extension for cache-friendly context control in long-running sessions."
+version: "0.5.1"
+baseurl: "/pi-local-context-manager"
 url: "https://saehwanpark.github.io"
 markdown: kramdown
 kramdown:

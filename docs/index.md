@@ -1,12 +1,12 @@
 ---
 title: Documentation portal
-description: Beginner-friendly documentation for local-context-manager, a Pi extension that keeps long sessions usable.
+description: Beginner-friendly documentation for pi-local-context-manager, a Pi extension that keeps long sessions usable.
 ---
 
 <div class="hero">
 <p class="eyebrow">Pi extension · release {{ site.version }}</p>
 <h1>Keep long Pi sessions usable.</h1>
-<p class="lede">Local Context Manager helps you notice context growth, keep oversized tool output from taking over the conversation, and cross a meaningful work boundary without silently losing the work you just finished.</p>
+<p class="lede">pi-local-context-manager helps you notice context growth, keep oversized tool output from taking over the conversation, and cross a meaningful work boundary without silently losing the work you just finished.</p>
 <div class="hero-actions">
 <a class="button" href="{{ '/guides/installation.html' | relative_url }}">Install in 60 seconds</a>
 <a class="button secondary" href="{{ '/guides/understanding-context.html' | relative_url }}">Understand the problem</a>
@@ -52,9 +52,9 @@ The extension is designed for the middle ground: keep the active conversation sm
 1. Install Pi and authenticate with a provider using the [official Pi quickstart](https://github.com/earendil-works/pi#quick-start).
 2. Install this package directly from GitHub:
    ```bash
-   pi install git:github.com/SaehwanPark/local-context-manager
+   pi install git:github.com/SaehwanPark/pi-local-context-manager
    ```
-   *(To pin a specific release version, append `#<tag>`, e.g., `pi install git:github.com/SaehwanPark/local-context-manager#v0.5.0`)*
+   *(To pin a specific release version, append `#<tag>`, e.g., `pi install git:github.com/SaehwanPark/pi-local-context-manager#v0.5.1`)*
 3. Start Pi in a project (`pi`) or reload an already-running session with `/reload`.
 4. Run:
    ```text
@@ -99,6 +99,6 @@ Read [Why context matters]({{ '/guides/understanding-context.html' | relative_ur
 
 ## Project links
 
-- [Source code and issues](https://github.com/SaehwanPark/local-context-manager)
+- [Source code and issues](https://github.com/SaehwanPark/pi-local-context-manager)
 - [npm package](https://www.npmjs.com/package/local-context-manager)
-- [Changelog](https://github.com/SaehwanPark/local-context-manager/blob/main/CHANGELOG.md)
+- [Changelog](https://github.com/SaehwanPark/pi-local-context-manager/blob/main/CHANGELOG.md)

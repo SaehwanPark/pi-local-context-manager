@@ -109,7 +109,7 @@ Check recent archives with:
 The default storage location is outside the repository:
 
 ```text
-~/.pi/agent/local-context-manager/checkpoints/<repository-hash>/<timestamp>-<reason>.md
+~/.pi/agent/pi-local-context-manager/checkpoints/<repository-hash>/<timestamp>-<reason>.md
 ```
 
 `PI_CODING_AGENT_DIR` changes the `~/.pi/agent` root. `checkpointDirectory` can choose another local root; see [Configuration]({{ '/reference/configuration.html' | relative_url }}).

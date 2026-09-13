@@ -1,6 +1,6 @@
 ---
 title: Configuration reference
-description: Configure local-context-manager thresholds, optional workflows, and local checkpoint storage.
+description: Configure pi-local-context-manager thresholds, optional workflows, and local checkpoint storage.
 ---
 
 # Configuration reference
@@ -14,7 +14,7 @@ No configuration is required. The invisible default is the `balanced` context mo
 The global configuration file is:
 
 ```text
-~/.pi/agent/local-context-manager.json
+~/.pi/agent/pi-local-context-manager.json
 ```
 
 If Pi uses a different agent directory, the extension follows `PI_CODING_AGENT_DIR`:
@@ -26,16 +26,16 @@ PI_CODING_AGENT_DIR=/path/to/pi-agent pi
 A trusted project can override global values with:
 
 ```text
-<project>/.pi/local-context-manager.json
+<project>/.pi/pi-local-context-manager.json
 ```
 
 Project configuration is read only when Pi considers the project trusted. This prevents a checked-out project from silently changing your global behavior. See Pi's [project trust documentation](https://github.com/earendil-works/pi#project-trust) if you are new to that prompt.
 
-Later project values override global values. You may either put settings at the top level or use an optional `localContextManager` wrapper:
+Later project values override global values. You may either put settings at the top level or use an optional `piLocalContextManager` (or legacy `localContextManager`) wrapper:
 
 ```json
 {
-  "localContextManager": {
+  "piLocalContextManager": {
     "contextProfile": "balanced",
     "toolOutputReduction": true,
     "softWarningTokens": 24000,
@@ -123,7 +123,7 @@ If you only need to turn off one behavior, use a small project override instead:
 
 ```json
 {
-  "localContextManager": {
+  "piLocalContextManager": {
     "toolOutputReduction": false
   }
 }
@@ -148,7 +148,7 @@ Use the four numeric fields only when measuring a specialized setup. Keep `keepR
 With `checkpointDirectory: null`, archives are stored under:
 
 ```text
-<agent-dir>/local-context-manager/checkpoints/<repository-hash>/<timestamp>-<reason>.md
+<agent-dir>/pi-local-context-manager/checkpoints/<repository-hash>/<timestamp>-<reason>.md
 ```
 
 The default agent directory is `~/.pi/agent`. A configured path can be absolute or relative; relative paths resolve from the Pi agent directory, never the working tree (protecting repositories from accidental checkpoint commits). The extension still separates repositories with a non-reversible repository hash.

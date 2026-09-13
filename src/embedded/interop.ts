@@ -8,7 +8,8 @@ export interface PiExtensionInteropRegistryV1 {
   providers: Map<string, unknown>;
 }
 
-export const LCM_EMBEDDED_CONTEXT_PROVIDER_NAME = "local-context-manager.embedded-context.v1";
+export const LCM_EMBEDDED_CONTEXT_PROVIDER_NAME = "pi-local-context-manager.embedded-context.v1";
+export const LEGACY_LCM_EMBEDDED_CONTEXT_PROVIDER_NAME = "local-context-manager.embedded-context.v1";
 export const SAFE_AGENT_FABRIC_PROVIDER_NAME = "safe-agent-team.fabric-state.v1";
 
 export interface FabricSnapshotRequest {
@@ -199,9 +200,12 @@ export function registerInteropProvider(name: string, provider: unknown): boolea
 export function registerEmbeddedContextManagerProvider(
   factory: (host: EmbeddedContextHost, options?: EmbeddedContextManagerOptions) => EmbeddedContextManager = createEmbeddedContextManager,
 ): boolean {
-  return registerInteropProvider(LCM_EMBEDDED_CONTEXT_PROVIDER_NAME, {
+  const provider = {
     createEmbeddedContextManager: factory,
-  });
+  };
+  const primary = registerInteropProvider(LCM_EMBEDDED_CONTEXT_PROVIDER_NAME, provider);
+  registerInteropProvider(LEGACY_LCM_EMBEDDED_CONTEXT_PROVIDER_NAME, provider);
+  return primary;
 }
 
 export function unregisterInteropProvider(name: string, provider?: unknown): boolean {
@@ -441,7 +445,7 @@ export async function queryFabricObservation(
   if (!status.shared) {
     return {
       kind: "uncertain",
-      reason: `Extension interop registry v${status.publishedVersion} is not understood by local-context-manager, so fabric state cannot be verified`,
+      reason: `Extension interop registry v${status.publishedVersion} is not understood by pi-local-context-manager, so fabric state cannot be verified`,
     };
   }
 

@@ -1,6 +1,14 @@
 # Changelog
 
-All notable changes to `local-context-manager` are documented here. Version numbers also mark the project milestones represented by the merged pull requests.
+All notable changes to `pi-local-context-manager` are documented here. Version numbers also mark the project milestones represented by the merged pull requests.
+
+## [0.5.1] - 2026-09-13
+
+### Changed
+
+- **Project Rebranding**: Rebranded the project from `local-context-manager` to `pi-local-context-manager` across directory naming, GitHub repository identity, package manifest, configuration file paths (`pi-local-context-manager.json`), CLI status keys, logging prefixes, and user documentation to align with companion Pi ecosystem projects (`pi-safe-agent-team`, `pi-with-chatgpt`, `pi-mono-context-guard`).
+- **Backward Compatibility**: Preserved seamless fallback and aliases for legacy `local-context-manager.json` configuration files, `localContextManager` configuration wrappers, `local-context-manager.embedded-context.v1` interop registration, and `local-context-manager-checkpoint-reset` session entry records.
+- **Package Identity**: Updated `package.json` package name to `pi-local-context-manager` and bumped version to `0.5.1`. Prior-published npm package references are maintained for historical context while npm access issues are resolved.
 
 ## [0.5.0] - 2026-09-13
 
@@ -63,11 +71,11 @@ This release addresses cross-project audit feedback to ensure safe coordination 
 
 ## [0.4.0] - 2026-09-08
 
-This release hardens `local-context-manager` for multi-agent workflows, long-running sessions, and companion extension interoperability without introducing hard dependencies.
+This release hardens `pi-local-context-manager` for multi-agent workflows, long-running sessions, and companion extension interoperability without introducing hard dependencies.
 
 ### Added
 
-- **Embeddable Context Manager**: Exported `createEmbeddedContextManager` from `local-context-manager/embedded` so host runtimes (such as `pi-safe-agent-team`) can manage child agent sessions safely without loading extensions.
+- **Embeddable Context Manager**: Exported `createEmbeddedContextManager` from `pi-local-context-manager/embedded` so host runtimes (such as `pi-safe-agent-team`) can manage child agent sessions safely without loading extensions.
 - **Process-Local Interop Registry**: Implemented `Symbol.for("pi.extension-interop.v1")` provider registration for `local-context-manager.embedded-context.v1` and optional consumption of `safe-agent-team.fabric-state.v1`.
 - **Fabric-Aware Semantic Reset**: Automatic semantic checkpoint/reset recommendations defer while delegated child work is active/non-quiescent unless the hard context ceiling is reached.
 - **Evidence-Completeness Provenance**: Tool output reductions append an explicit non-exhaustive excerpt notice; compactions retain a bounded evidence-completeness caveat note when prior reductions occurred; recovery copies are stored with `0600` permissions.
@@ -203,19 +211,20 @@ Initial extension milestone delivered by [PR #1](https://github.com/SaehwanPark/
 - Reviewed `/handoff <objective>` continuation prompts and fresh-session initialization.
 - Package metadata, examples, tests, and build/typecheck configuration.
 
-[0.5.0]: https://github.com/SaehwanPark/local-context-manager/compare/v0.4.3...v0.5.0
-[0.4.3]: https://github.com/SaehwanPark/local-context-manager/compare/v0.4.2...v0.4.3
-[0.4.2]: https://github.com/SaehwanPark/local-context-manager/compare/v0.4.1...v0.4.2
-[0.4.1]: https://github.com/SaehwanPark/local-context-manager/compare/v0.4.0...v0.4.1
-[0.4.0]: https://github.com/SaehwanPark/local-context-manager/compare/v0.3.8...v0.4.0
-[0.3.8]: https://github.com/SaehwanPark/local-context-manager/compare/v0.3.7...v0.3.8
-[0.3.7]: https://github.com/SaehwanPark/local-context-manager/compare/v0.3.6...v0.3.7
-[0.3.6]: https://github.com/SaehwanPark/local-context-manager/compare/v0.3.5...v0.3.6
-[0.3.5]: https://github.com/SaehwanPark/local-context-manager/compare/v0.3.4...v0.3.5
-[0.3.4]: https://github.com/SaehwanPark/local-context-manager/compare/v0.3.3...v0.3.4
-[0.3.3]: https://github.com/SaehwanPark/local-context-manager/compare/v0.3.2...v0.3.3
-[0.3.2]: https://github.com/SaehwanPark/local-context-manager/compare/v0.3.1...v0.3.2
-[0.3.1]: https://github.com/SaehwanPark/local-context-manager/pull/5
-[0.3.0]: https://github.com/SaehwanPark/local-context-manager/releases/tag/v0.3.0
-[0.2.0]: https://github.com/SaehwanPark/local-context-manager/pull/2
-[0.1.0]: https://github.com/SaehwanPark/local-context-manager/pull/1
+[0.5.1]: https://github.com/SaehwanPark/pi-local-context-manager/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/SaehwanPark/pi-local-context-manager/compare/v0.4.3...v0.5.0
+[0.4.3]: https://github.com/SaehwanPark/pi-local-context-manager/compare/v0.4.2...v0.4.3
+[0.4.2]: https://github.com/SaehwanPark/pi-local-context-manager/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/SaehwanPark/pi-local-context-manager/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/SaehwanPark/pi-local-context-manager/compare/v0.3.8...v0.4.0
+[0.3.8]: https://github.com/SaehwanPark/pi-local-context-manager/compare/v0.3.7...v0.3.8
+[0.3.7]: https://github.com/SaehwanPark/pi-local-context-manager/compare/v0.3.6...v0.3.7
+[0.3.6]: https://github.com/SaehwanPark/pi-local-context-manager/compare/v0.3.5...v0.3.6
+[0.3.5]: https://github.com/SaehwanPark/pi-local-context-manager/compare/v0.3.4...v0.3.5
+[0.3.4]: https://github.com/SaehwanPark/pi-local-context-manager/compare/v0.3.3...v0.3.4
+[0.3.3]: https://github.com/SaehwanPark/pi-local-context-manager/compare/v0.3.2...v0.3.3
+[0.3.2]: https://github.com/SaehwanPark/pi-local-context-manager/compare/v0.3.1...v0.3.2
+[0.3.1]: https://github.com/SaehwanPark/pi-local-context-manager/pull/5
+[0.3.0]: https://github.com/SaehwanPark/pi-local-context-manager/releases/tag/v0.3.0
+[0.2.0]: https://github.com/SaehwanPark/pi-local-context-manager/pull/2
+[0.1.0]: https://github.com/SaehwanPark/pi-local-context-manager/pull/1

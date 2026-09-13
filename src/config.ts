@@ -9,7 +9,7 @@ export interface ContextThresholds {
   keepRecentTokens: number;
 }
 
-export interface LocalContextManagerConfig {
+export interface PiLocalContextManagerConfig {
   enabled: boolean;
   contextProfile: ContextProfile;
   softWarningTokens: number;
@@ -23,6 +23,8 @@ export interface LocalContextManagerConfig {
   checkpointDirectory: string | null;
   debug: boolean;
 }
+
+export type LocalContextManagerConfig = PiLocalContextManagerConfig;
 
 export const CONTEXT_PROFILE_THRESHOLDS: Readonly<Record<ContextProfile, Readonly<ContextThresholds>>> = Object.freeze({
   aggressive: Object.freeze({
@@ -68,7 +70,9 @@ export interface LoadedConfig {
 
 export interface LoadConfigOptions {
   globalConfigPath: string;
+  fallbackGlobalConfigPath?: string;
   projectConfigPath?: string;
+  fallbackProjectConfigPath?: string;
   allowProjectConfig?: boolean;
 }
 
@@ -157,7 +161,7 @@ function configObject(value: unknown): RecordValue | undefined {
     return undefined;
   }
 
-  const nested = value.localContextManager;
+  const nested = value.piLocalContextManager ?? value.localContextManager;
   return isRecord(nested) ? nested : value;
 }
 
@@ -312,27 +316,43 @@ export async function loadConfig(options: LoadConfigOptions): Promise<LoadedConf
   const errors: string[] = [];
   const files: string[] = [];
 
-  const global = await readConfigFile(options.globalConfigPath);
+  let global = await readConfigFile(options.globalConfigPath);
+  let globalPath = options.globalConfigPath;
+  if (!global.found && options.fallbackGlobalConfigPath) {
+    const fallback = await readConfigFile(options.fallbackGlobalConfigPath);
+    if (fallback.found) {
+      global = fallback;
+      globalPath = options.fallbackGlobalConfigPath;
+    }
+  }
   if (global.found) {
-    files.push(options.globalConfigPath);
+    files.push(globalPath);
   }
   if (global.error) {
     errors.push(global.error);
   } else if (global.found) {
-    const parsed = parseConfig(global.value, config, options.globalConfigPath);
+    const parsed = parseConfig(global.value, config, globalPath);
     config = parsed.config;
     errors.push(...parsed.errors);
   }
 
   if (options.allowProjectConfig !== false && options.projectConfigPath) {
-    const project = await readConfigFile(options.projectConfigPath);
+    let project = await readConfigFile(options.projectConfigPath);
+    let projectPath = options.projectConfigPath;
+    if (!project.found && options.fallbackProjectConfigPath) {
+      const fallback = await readConfigFile(options.fallbackProjectConfigPath);
+      if (fallback.found) {
+        project = fallback;
+        projectPath = options.fallbackProjectConfigPath;
+      }
+    }
     if (project.found) {
-      files.push(options.projectConfigPath);
+      files.push(projectPath);
     }
     if (project.error) {
       errors.push(project.error);
     } else if (project.found) {
-      const parsed = parseConfig(project.value, config, options.projectConfigPath);
+      const parsed = parseConfig(project.value, config, projectPath);
       config = parsed.config;
       errors.push(...parsed.errors);
     }

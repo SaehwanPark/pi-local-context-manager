@@ -1,13 +1,13 @@
 ---
 title: Why context matters
-description: A plain-language explanation of context windows, local-model prefill, compaction, and the design boundaries of local-context-manager.
+description: A plain-language explanation of context windows, local-model prefill, compaction, and the design boundaries of pi-local-context-manager.
 ---
 
 # Why context matters
 
 [Documentation portal]({{ '/' | relative_url }}) · [Install & launch]({{ '/guides/installation.html' | relative_url }}) · [How to use it]({{ '/guides/how-to-use.html' | relative_url }})
 
-You can use Pi without knowing any of the terms on this page. This is the mental model that explains why `local-context-manager` exists.
+You can use Pi without knowing any of the terms on this page. This is the mental model that explains why `pi-local-context-manager` exists.
 
 ## What is “context”?
 

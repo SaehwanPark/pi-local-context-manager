@@ -1,17 +1,17 @@
 {
-  "name": "local-context-manager",
-  "version": "0.5.0",
+  "name": "pi-local-context-manager",
+  "version": "0.5.1",
   "description": "A Pi extension for cache-friendly context control in long-running local-LLM workflows",
   "type": "module",
   "keywords": ["pi-package", "pi-extension", "local-llm", "context-management"],
   "author": "Sae-Hwan Park",
-  "homepage": "https://saehwanpark.github.io/local-context-manager/",
+  "homepage": "https://saehwanpark.github.io/pi-local-context-manager/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/SaehwanPark/local-context-manager.git"
+    "url": "git+https://github.com/SaehwanPark/pi-local-context-manager.git"
   },
   "bugs": {
-    "url": "https://github.com/SaehwanPark/local-context-manager/issues"
+    "url": "https://github.com/SaehwanPark/pi-local-context-manager/issues"
   },
   "license": "MIT",
   "main": "./dist/src/index.js",

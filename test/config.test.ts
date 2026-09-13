@@ -77,8 +77,16 @@ describe("configuration", () => {
     expect(invalid.errors.join(" ")).toContain("checkpointDirectory");
   });
 
+  it("parses piLocalContextManager wrapper and legacy localContextManager wrapper", () => {
+    const modern = parseConfig({ piLocalContextManager: { contextProfile: "aggressive" } });
+    expect(modern.config.contextProfile).toBe("aggressive");
+
+    const legacy = parseConfig({ localContextManager: { contextProfile: "relaxed" } });
+    expect(legacy.config.contextProfile).toBe("relaxed");
+  });
+
   it("layers global and trusted project JSON, with project values winning", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "local-context-manager-test-"));
+    const directory = await mkdtemp(join(tmpdir(), "pi-local-context-manager-test-"));
     try {
       const globalPath = join(directory, "global.json");
       const projectPath = join(directory, "project.json");
@@ -100,8 +108,27 @@ describe("configuration", () => {
     }
   });
 
+  it("falls back to legacy config paths when primary config files are absent", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "pi-local-context-manager-test-"));
+    try {
+      const legacyGlobalPath = join(directory, "local-context-manager.json");
+      const primaryGlobalPath = join(directory, "pi-local-context-manager.json");
+      await writeFile(legacyGlobalPath, JSON.stringify({ softWarningTokens: 22_000 }));
+
+      const loaded = await loadConfig({
+        globalConfigPath: primaryGlobalPath,
+        fallbackGlobalConfigPath: legacyGlobalPath,
+      });
+
+      expect(loaded.config.softWarningTokens).toBe(22_000);
+      expect(loaded.files).toEqual([legacyGlobalPath]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("ignores project configuration when the project is untrusted", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "local-context-manager-test-"));
+    const directory = await mkdtemp(join(tmpdir(), "pi-local-context-manager-test-"));
     try {
       const globalPath = join(directory, "global.json");
       const projectPath = join(directory, "project.json");
@@ -122,7 +149,7 @@ describe("configuration", () => {
   });
 
   it("keeps layered token ordering valid when a later layer lowers a threshold", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "local-context-manager-test-"));
+    const directory = await mkdtemp(join(tmpdir(), "pi-local-context-manager-test-"));
     try {
       const globalPath = join(directory, "global.json");
       const projectPath = join(directory, "project.json");
@@ -143,7 +170,7 @@ describe("configuration", () => {
   });
 
   it("reports malformed JSON without throwing", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "local-context-manager-test-"));
+    const directory = await mkdtemp(join(tmpdir(), "pi-local-context-manager-test-"));
     try {
       const path = join(directory, "broken.json");
       await writeFile(path, "{ broken");
