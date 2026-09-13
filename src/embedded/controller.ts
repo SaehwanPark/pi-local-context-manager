@@ -38,6 +38,7 @@ export class EmbeddedContextController implements EmbeddedContextManager {
 
   private currentTokens: number | null = null;
   private currentContextWindow: number | null = null;
+  private currentEffectiveContextBudget: number | null = null;
   private currentTokenSource: EmbeddedContextSnapshot["tokenSource"] = "unknown";
   private turnSerial = 0;
   private compactionsCount = 0;
@@ -68,9 +69,13 @@ export class EmbeddedContextController implements EmbeddedContextManager {
     }
 
     this.config = baseConfig;
+    const logicalContextWindow = positiveFinite(options.logicalContextWindow ?? options.contextWindow);
+    const effectiveContextBudget = positiveFinite(options.effectivePrefillBudget ?? options.effectiveContextBudget);
+    this.currentContextWindow = logicalContextWindow ?? null;
+    this.currentEffectiveContextBudget = clampEffectiveBudget(effectiveContextBudget === null ? undefined : effectiveContextBudget, logicalContextWindow === null ? undefined : logicalContextWindow);
     const initialThresholds = getEffectiveThresholds(
       this.config,
-      options.contextWindow ?? this.config.compactThresholdTokens * 2,
+      this.currentEffectiveContextBudget ?? this.currentContextWindow ?? this.config.compactThresholdTokens * 2,
     );
     this.gate = new CompactionGate({
       rearmTokens: getRearmTokens(initialThresholds.softWarningTokens, initialThresholds.compactThresholdTokens),
@@ -80,7 +85,10 @@ export class EmbeddedContextController implements EmbeddedContextManager {
   }
 
   private resolveThresholds(): ContextThresholds {
-    return getEffectiveThresholds(this.config, this.currentContextWindow ?? undefined);
+    return getEffectiveThresholds(
+      this.config,
+      this.currentEffectiveContextBudget ?? this.currentContextWindow ?? undefined,
+    );
   }
 
   private refreshUsage(): { tokens: number | null; thresholds: ContextThresholds } {
@@ -99,15 +107,18 @@ export class EmbeddedContextController implements EmbeddedContextManager {
       });
     }
 
+    const logicalContextWindow = positiveFinite(usage?.logicalContextWindow ?? usage?.contextWindow) ?? this.currentContextWindow;
+    const effectiveContextBudget = positiveFinite(usage?.effectivePrefillBudget ?? usage?.effectiveContextBudget) ?? this.currentEffectiveContextBudget;
+    this.currentContextWindow = logicalContextWindow ?? null;
+    this.currentEffectiveContextBudget = clampEffectiveBudget(effectiveContextBudget === null ? undefined : effectiveContextBudget, logicalContextWindow === null ? undefined : logicalContextWindow);
+
     if (usage && usage.tokens !== null && Number.isFinite(usage.tokens) && usage.tokens >= 0) {
       this.currentTokens = usage.tokens;
-      this.currentContextWindow = usage.contextWindow;
       this.currentTokenSource = usage.source ?? "pi-estimate";
     } else {
       try {
         const entries = this.host.getContextEntries();
         this.currentTokens = estimateActiveContextTokens(entries);
-        this.currentContextWindow = usage?.contextWindow ?? null;
         this.currentTokenSource = "local-fallback";
       } catch (error) {
         this.currentTokens = null;
@@ -282,6 +293,8 @@ export class EmbeddedContextController implements EmbeddedContextManager {
       tokens: this.currentTokens,
       contextTokens: this.currentTokens,
       contextWindow: this.currentContextWindow,
+      logicalContextWindow: this.currentContextWindow,
+      effectiveContextBudget: this.currentEffectiveContextBudget,
       tokenSource: this.currentTokenSource,
       compactThresholdTokens: thresholds.compactThresholdTokens,
       percentOfThreshold,
@@ -311,6 +324,15 @@ export class EmbeddedContextController implements EmbeddedContextManager {
       void this.recoveryStorage.cleanup().catch(() => undefined);
     }
   }
+}
+
+function positiveFinite(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
+}
+
+function clampEffectiveBudget(effective: number | undefined, logical: number | undefined): number | null {
+  if (effective === undefined) return null;
+  return logical === undefined ? effective : Math.min(effective, logical);
 }
 
 export function createEmbeddedContextManager(

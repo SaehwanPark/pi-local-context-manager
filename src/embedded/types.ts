@@ -11,6 +11,12 @@ export type EmbeddedContextUsageSource =
 export interface EmbeddedContextUsage {
   tokens: number | null;
   contextWindow: number | null;
+  /** Advertised/logical model window when an operational budget is applied. */
+  logicalContextWindow?: number | null;
+  /** Hardware-safe budget used for proactive context policy. */
+  effectiveContextBudget?: number | null;
+  /** Compatibility alias used by newer safe-agent hosts. */
+  effectivePrefillBudget?: number | null;
   source: EmbeddedContextUsageSource;
 }
 
@@ -23,6 +29,8 @@ export interface EmbeddedContextSnapshot {
   tokens?: number | null;
   contextTokens: number | null;
   contextWindow: number | null;
+  logicalContextWindow?: number | null;
+  effectiveContextBudget?: number | null;
   tokenSource: "pi-estimate" | "local-fallback" | "reported" | "estimated" | "unknown";
   compactThresholdTokens: number;
   percentOfThreshold: number | null;
@@ -69,6 +77,15 @@ export interface EmbeddedContextManagerOptions {
    * Optional advertised model context window.
    */
   contextWindow?: number;
+
+  /** Advertised/logical model window, retained separately from policy budget. */
+  logicalContextWindow?: number;
+
+  /** Operational budget used by proactive threshold/compaction policy. */
+  effectiveContextBudget?: number;
+
+  /** Compatibility alias for effectiveContextBudget. */
+  effectivePrefillBudget?: number;
 
   /**
    * Optional per-instance recovery storage.
