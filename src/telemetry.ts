@@ -1,6 +1,14 @@
+import type { ResolvedContextPolicy } from "./config.js";
+
 export interface ContextUsageLike {
   tokens: number | null;
   contextWindow: number;
+  /** Advertised/logical model window when a runtime supplies a separate budget. */
+  logicalContextWindow?: number | null;
+  /** Runtime-safe budget used by proactive context management. */
+  effectiveContextBudget?: number | null;
+  /** Compatibility alias for effectiveContextBudget. */
+  effectivePrefillBudget?: number | null;
 }
 
 export type ContextTokenSource =
@@ -13,6 +21,13 @@ export type ContextTokenSource =
 export interface TelemetrySnapshot {
   contextTokens: number | null;
   contextWindow: number | null;
+  logicalContextWindow: number | null;
+  effectiveContextBudget: number | null;
+  workingContextBudget: number | null;
+  percentOfWorkingBudget: number | null;
+  postCompactionTokens: number | null;
+  epochSlackTokens: number | null;
+  epochSlackRatio: number | null;
   tokenSource: ContextTokenSource;
   compactThresholdTokens: number;
   percentOfThreshold: number | null;
@@ -32,8 +47,11 @@ export interface TelemetrySnapshot {
 export class ContextTelemetry {
   private contextTokens: number | null = null;
   private contextWindow: number | null = null;
+  private logicalContextWindow: number | null = null;
+  private effectiveContextBudget: number | null = null;
   private tokenSource: ContextTokenSource = "unknown";
   private baselineTokens: number | null = null;
+  private hasCompactionBaseline = false;
   private tokensAddedSinceCompaction: number | null = null;
   private approximateToolOutputTokens = 0;
   private toolOutputTokensRemoved = 0;
@@ -66,7 +84,19 @@ export class ContextTelemetry {
       return;
     }
 
-    this.contextWindow = Number.isFinite(usage.contextWindow) && usage.contextWindow > 0 ? usage.contextWindow : null;
+    this.contextWindow = positiveFinite(usage.contextWindow);
+    const logicalContextWindow = positiveFinite(usage.logicalContextWindow) ?? positiveFinite(usage.contextWindow);
+    if (logicalContextWindow !== null) {
+      this.logicalContextWindow = logicalContextWindow;
+    }
+    const effectiveCandidates = [usage.effectiveContextBudget, usage.effectivePrefillBudget]
+      .map(positiveFinite)
+      .filter((value): value is number => value !== null);
+    if (effectiveCandidates.length > 0) {
+      this.effectiveContextBudget = Math.min(...effectiveCandidates);
+    } else if (usage.effectiveContextBudget !== undefined || usage.effectivePrefillBudget !== undefined) {
+      this.effectiveContextBudget = null;
+    }
     if (usage.tokens === null || !Number.isFinite(usage.tokens) || usage.tokens < 0) {
       this.contextTokens = null;
       this.tokensAddedSinceCompaction = null;
@@ -79,8 +109,10 @@ export class ContextTelemetry {
   }
 
   observeEstimate(tokens: number, contextWindow?: number): void {
-    if (Number.isFinite(contextWindow) && contextWindow !== undefined && contextWindow > 0) {
-      this.contextWindow = contextWindow;
+    const normalizedWindow = positiveFinite(contextWindow);
+    if (normalizedWindow !== null) {
+      this.contextWindow = normalizedWindow;
+      this.logicalContextWindow = normalizedWindow;
     }
     if (!Number.isFinite(tokens) || tokens < 0) {
       this.tokenSource = "unknown";
@@ -109,6 +141,7 @@ export class ContextTelemetry {
       return;
     }
     this.baselineTokens = tokens;
+    this.hasCompactionBaseline = true;
     if (this.contextTokens !== null) {
       this.tokensAddedSinceCompaction = Math.max(0, this.contextTokens - tokens);
     }
@@ -143,6 +176,7 @@ export class ContextTelemetry {
     this.lastCompactionAt = Number.isFinite(timestamp) ? timestamp : Date.now();
     this.lastCompactionTurn = turn;
     this.baselineTokens = postTokens !== null && Number.isFinite(postTokens) ? postTokens : null;
+    this.hasCompactionBaseline = postTokens !== null && Number.isFinite(postTokens);
     this.contextTokens = postTokens !== null && Number.isFinite(postTokens) ? postTokens : null;
     this.tokensAddedSinceCompaction = postTokens !== null && Number.isFinite(postTokens) ? 0 : null;
     if (source) {
@@ -163,15 +197,43 @@ export class ContextTelemetry {
     this.lastCheckpointPath = path;
   }
 
-  snapshot(compactThresholdTokens: number): TelemetrySnapshot {
+  snapshot(
+    compactThresholdTokens: number,
+    policy?: Pick<ResolvedContextPolicy, "workingContextBudget" | "logicalContextWindow" | "effectiveContextBudget">,
+  ): TelemetrySnapshot {
+    const logicalContextWindow = policy?.logicalContextWindow ?? this.logicalContextWindow;
+    const effectiveContextBudget = policy?.effectiveContextBudget ?? this.effectiveContextBudget;
+    // A policy is required to make the working-budget denominator authoritative.
+    // Without one, retain the historical threshold-only snapshot semantics for
+    // embedders that only consume ContextTelemetry directly.
+    const workingContextBudget = policy?.workingContextBudget ?? null;
     const percentOfThreshold =
       this.contextTokens !== null && compactThresholdTokens > 0
         ? (this.contextTokens / compactThresholdTokens) * 100
+        : null;
+    const percentOfWorkingBudget =
+      this.contextTokens !== null && workingContextBudget !== null && workingContextBudget > 0
+        ? (this.contextTokens / workingContextBudget) * 100
+        : null;
+    const epochSlackTokens =
+      policy?.workingContextBudget !== null && policy !== undefined && this.hasCompactionBaseline && this.baselineTokens !== null
+        ? compactThresholdTokens - this.baselineTokens
+        : null;
+    const epochSlackRatio =
+      epochSlackTokens !== null && workingContextBudget !== null && workingContextBudget > 0
+        ? epochSlackTokens / workingContextBudget
         : null;
 
     return {
       contextTokens: this.contextTokens,
       contextWindow: this.contextWindow,
+      logicalContextWindow,
+      effectiveContextBudget,
+      workingContextBudget,
+      percentOfWorkingBudget,
+      postCompactionTokens: this.hasCompactionBaseline ? this.baselineTokens : null,
+      epochSlackTokens,
+      epochSlackRatio,
       tokenSource: this.tokenSource,
       compactThresholdTokens,
       percentOfThreshold,
@@ -222,11 +284,16 @@ export function formatTelemetryStatus(snapshot: TelemetrySnapshot): string {
     (snapshot.tokenSource === "local-fallback" || snapshot.tokenSource === "estimated") &&
     snapshot.contextTokens !== null;
   const context = isEstimate ? `~${tokenFormatted}` : tokenFormatted;
-  const threshold = formatTokenCount(snapshot.compactThresholdTokens);
-  const percent = snapshot.percentOfThreshold === null ? "?" : `${Math.round(snapshot.percentOfThreshold)}%`;
+  const denominator = snapshot.workingContextBudget ?? snapshot.compactThresholdTokens;
+  const threshold = formatTokenCount(denominator);
+  const percentValue = snapshot.percentOfWorkingBudget ?? snapshot.percentOfThreshold;
+  const percent = percentValue === null ? "?" : `${Math.round(percentValue)}%`;
   const added = formatTokenCount(snapshot.tokensAddedSinceCompaction);
   const tools = formatTokenCount(snapshot.approximateToolOutputTokens);
-  return `ctx ${context}/${threshold} (${percent}) · +${added} · tool≈${tools} · c${snapshot.compactions}`;
+  const compact = snapshot.workingContextBudget !== null
+    ? ` · compact ${formatTokenCount(snapshot.compactThresholdTokens)}`
+    : "";
+  return `ctx ${context}/${threshold} (${percent})${compact} · +${added} · tool≈${tools} · c${snapshot.compactions}`;
 }
 
 export function formatTelemetryDetails(snapshot: TelemetrySnapshot): string {
@@ -237,8 +304,12 @@ export function formatTelemetryDetails(snapshot: TelemetrySnapshot): string {
     `Context: ${tokenFormatted} tokens${sourceLabel}`,
     `Token source: ${sourceDescription}`,
     `Context window: ${formatTokenCount(snapshot.contextWindow)}`,
+    `Logical model window: ${formatTokenCount(snapshot.logicalContextWindow)}`,
+    `Effective working budget: ${formatTokenCount(snapshot.workingContextBudget)}`,
+    `Budget consumed: ${snapshot.percentOfWorkingBudget === null ? "unknown" : `${snapshot.percentOfWorkingBudget.toFixed(1)}%`}`,
     `Compact threshold: ${formatTokenCount(snapshot.compactThresholdTokens)} tokens`,
     `Threshold consumed: ${snapshot.percentOfThreshold === null ? "unknown" : `${snapshot.percentOfThreshold.toFixed(1)}%`}`,
+    `Post-compaction slack: ${snapshot.epochSlackTokens === null ? "unknown" : `${formatTokenCount(snapshot.epochSlackTokens)} tokens${snapshot.epochSlackRatio === null ? "" : ` (${(snapshot.epochSlackRatio * 100).toFixed(1)}% of working budget)`}`}`,
     `Added since compaction: ${formatTokenCount(snapshot.tokensAddedSinceCompaction)} tokens`,
     `Active tool output: approximately ${formatTokenCount(snapshot.approximateToolOutputTokens)} tokens`,
     `Tool output reduced: ${snapshot.toolOutputsReduced} result(s), approximately ${formatTokenCount(snapshot.toolOutputTokensRemoved)} tokens removed`,
@@ -254,4 +325,12 @@ export function formatTelemetryDetails(snapshot: TelemetrySnapshot): string {
     lines.push(`Last compaction turn: ${snapshot.lastCompactionTurn}`);
   }
   return lines.join("\n");
+}
+
+function positiveFinite(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  const normalized = Math.floor(value);
+  return normalized > 0 ? normalized : null;
 }

@@ -46,7 +46,7 @@ This extension helps you choose deliberately instead of discovering the tradeoff
 
 ### 1. A reading of the pressure
 
-`/context-stats` reports the context reading or estimate, threshold progress, post-compaction growth, reduced tool-output volume, and compaction history. A footer status item gives a compact view while you work.
+`/context-stats` reports the context reading or estimate, logical model window, effective working budget, threshold provenance, post-compaction growth, reduced tool-output volume, and compaction history. A footer status item gives a compact view while you work.
 
 The reading may be **unknown** immediately after compaction or before Pi receives provider usage. When possible, the extension estimates the active context from the current session; it does not pretend the estimate is exact.
 

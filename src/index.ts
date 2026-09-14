@@ -22,13 +22,13 @@ import {
 } from "./checkpoint-reset.js";
 import { getRearmTokens, CompactionGate, shouldTriggerThresholdCompaction } from "./policy.js";
 import {
-  CONTEXT_PROFILE_THRESHOLDS,
   DEFAULT_CONFIG,
-  getEffectiveThresholds,
+  resolveContextThresholds,
   loadConfig,
   type ContextProfile,
   type ContextThresholds,
   type LocalContextManagerConfig,
+  type ResolvedContextPolicy,
 } from "./config.js";
 import {
   ContextTelemetry,
@@ -89,6 +89,7 @@ interface PendingCompaction {
 interface ObservedContext {
   tokens: number | null;
   thresholds: ContextThresholds;
+  policy: ResolvedContextPolicy;
 }
 
 interface PiPathSettings {
@@ -124,22 +125,38 @@ async function getPiPathSettings(): Promise<PiPathSettings> {
   }
 }
 
-function resolveThresholds(
+function resolvePolicy(
   context: ExtensionContext,
   config: LocalContextManagerConfig,
   telemetry: ContextTelemetry,
-): ContextThresholds {
-  const contextWindow = telemetry.snapshot(config.compactThresholdTokens).contextWindow ?? context.model?.contextWindow;
-  return getEffectiveThresholds(config, contextWindow);
+): ResolvedContextPolicy {
+  const metadata = telemetry.snapshot(1);
+  return resolveContextThresholds({
+    profile: config.contextProfile,
+    logicalContextWindow: normalizePositiveWindow(context.model?.contextWindow) ?? metadata.logicalContextWindow ?? undefined,
+    effectiveContextBudget: metadata.effectiveContextBudget ?? config.effectiveContextBudgetTokens,
+    softWarningTokens: config.softWarningTokens,
+    compactThresholdTokens: config.compactThresholdTokens,
+    hardCeilingTokens: config.hardCeilingTokens,
+    keepRecentTokens: config.keepRecentTokens,
+  });
+}
+
+function normalizePositiveWindow(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+  const normalized = Math.floor(value);
+  return normalized > 0 ? normalized : undefined;
 }
 
 function statusWithCeiling(
   telemetry: ContextTelemetry,
-  thresholds: ContextThresholds,
+  policy: ResolvedContextPolicy,
 ): string {
-  const snapshot = telemetry.snapshot(thresholds.compactThresholdTokens);
+  const snapshot = telemetry.snapshot(policy.thresholds.compactThresholdTokens, policy);
   const status = formatTelemetryStatus(snapshot);
-  return snapshot.contextTokens !== null && snapshot.contextTokens >= thresholds.hardCeilingTokens
+  return snapshot.contextTokens !== null && snapshot.contextTokens >= policy.thresholds.hardCeilingTokens
     ? `${status} · hard ceiling`
     : status;
 }
@@ -148,16 +165,16 @@ function updateStatus(
   context: ExtensionContext,
   config: LocalContextManagerConfig,
   telemetry: ContextTelemetry,
-  thresholds?: ContextThresholds,
+  policy?: ResolvedContextPolicy,
 ): void {
   try {
     if (!context.hasUI) {
       return;
     }
-    const activeThresholds = thresholds ?? resolveThresholds(context, config, telemetry);
+    const activePolicy = policy ?? resolvePolicy(context, config, telemetry);
     context.ui.setStatus(
       EXTENSION_STATUS_KEY,
-      config.enabled ? statusWithCeiling(telemetry, activeThresholds) : "off",
+      config.enabled ? statusWithCeiling(telemetry, activePolicy) : "off",
     );
   } catch (error) {
     // Completion callbacks may outlive a replaced session. Status cleanup is
@@ -183,24 +200,30 @@ function observeContext(
   telemetry: ContextTelemetry,
   gate: CompactionGate,
 ): ObservedContext {
-  const usage = context.getContextUsage();
+  const usage = context.getContextUsage() as (ReturnType<ExtensionContext["getContextUsage"]> & {
+    logicalContextWindow?: number | null;
+    effectiveContextBudget?: number | null;
+    effectivePrefillBudget?: number | null;
+  }) | undefined;
   telemetry.observe(usage);
   if (usage?.tokens == null) {
     try {
       telemetry.observeEstimate(
         estimateActiveContextTokens(context.sessionManager.buildContextEntries()),
-        usage?.contextWindow ?? context.model?.contextWindow,
+        usage?.logicalContextWindow ?? usage?.contextWindow ?? context.model?.contextWindow,
       );
     } catch (error) {
       debugLog(config, "could not estimate active context", error);
     }
   }
-  const thresholds = resolveThresholds(context, config, telemetry);
+  const policy = resolvePolicy(context, config, telemetry);
+  const thresholds = policy.thresholds;
   gate.setRearmTokens(getRearmTokens(thresholds.softWarningTokens, thresholds.compactThresholdTokens));
-  const snapshot = telemetry.snapshot(thresholds.compactThresholdTokens);
+  gate.setWorkingContextBudget(policy.workingContextBudget);
+  const snapshot = telemetry.snapshot(thresholds.compactThresholdTokens, policy);
   gate.observe(snapshot.contextTokens, thresholds.compactThresholdTokens);
-  updateStatus(context, config, telemetry, thresholds);
-  return { tokens: snapshot.contextTokens, thresholds };
+  updateStatus(context, config, telemetry, policy);
+  return { tokens: snapshot.contextTokens, thresholds, policy };
 }
 
 function notifySoftWarning(
@@ -216,13 +239,17 @@ function notifySoftWarning(
   }
   warned.value = true;
   if (context.hasUI) {
+    const budget = observed.policy.workingContextBudget;
+    const budgetText = budget === null
+      ? "working budget unavailable"
+      : `${Math.round((tokens / budget) * 100)}% of the ${Math.round(budget).toLocaleString()}-token working budget`;
     context.ui.notify(
-      `Context is approaching the pi-local-context-manager threshold (${Math.round(tokens).toLocaleString()} tokens).`,
+      `Context is approaching the pi-local-context-manager threshold (${Math.round(tokens).toLocaleString()} tokens; ${budgetText}; compact at ${thresholds.compactThresholdTokens.toLocaleString()}).`,
       "warning",
     );
   }
   debugLog(config, `soft warning at ${tokens} tokens`);
-  updateStatus(context, config, telemetry, thresholds);
+  updateStatus(context, config, telemetry, observed.policy);
 }
 
 function parseContextProfile(value: string): ContextProfile | undefined {
@@ -239,6 +266,36 @@ function formatThresholdSummary(thresholds: ContextThresholds): string {
     `compact ${thresholds.compactThresholdTokens.toLocaleString()}`,
     `ceiling ${thresholds.hardCeilingTokens.toLocaleString()}`,
   ].join(" · ");
+}
+
+function formatThresholdSources(policy: ResolvedContextPolicy): string[] {
+  return [
+    `warning: ${formatThresholdSource(policy.sources.softWarning, policy.profile, policy.profilePolicy.warningRatio)}`,
+    `compact: ${formatThresholdSource(policy.sources.compact, policy.profile, policy.profilePolicy.compactRatio)}`,
+    `ceiling: ${formatThresholdSource(policy.sources.hardCeiling, policy.profile, policy.profilePolicy.ceilingRatio)}`,
+    `keep recent: ${formatThresholdSource(policy.sources.keepRecent, policy.profile, undefined)}`,
+  ];
+}
+
+function formatThresholdSource(source: string, profile: ContextProfile, ratio: number | undefined): string {
+  if (source === "profile-ratio" && ratio !== undefined) {
+    return `${profile} ratio (${formatRatio(ratio)})`;
+  }
+  if (source === "profile-ratio") {
+    return `${profile} cap`;
+  }
+  if (source === "explicit-token-override") {
+    return "explicit token override";
+  }
+  if (source === "small-window-clamp") {
+    return "small-window safety clamp";
+  }
+  return "legacy fallback";
+}
+
+function formatRatio(ratio: number): string {
+  const percent = ratio * 100;
+  return `${Number.isInteger(percent) ? percent : percent.toFixed(1)}%`;
 }
 
 
@@ -414,8 +471,17 @@ export default function (pi: ExtensionAPI): void {
   let profileOverride: ContextProfile | undefined;
   let pathSettings: PiPathSettings | undefined;
   let telemetry = new ContextTelemetry();
+  const initialPolicy = resolveContextThresholds({
+    profile: config.contextProfile,
+    effectiveContextBudget: config.effectiveContextBudgetTokens,
+    softWarningTokens: config.softWarningTokens,
+    compactThresholdTokens: config.compactThresholdTokens,
+    hardCeilingTokens: config.hardCeilingTokens,
+    keepRecentTokens: config.keepRecentTokens,
+  });
   let gate = new CompactionGate({
-    rearmTokens: getRearmTokens(config.softWarningTokens, config.compactThresholdTokens),
+    rearmTokens: getRearmTokens(initialPolicy.thresholds.softWarningTokens, initialPolicy.thresholds.compactThresholdTokens),
+    workingContextBudget: initialPolicy.workingContextBudget ?? undefined,
   });
   const evidenceTracker = new EvidenceReductionTracker();
   let semanticResetDeferredNotified = false;
@@ -613,9 +679,18 @@ export default function (pi: ExtensionAPI): void {
       checkpointReset?.createdAt ?? null,
       checkpointReset?.path ?? null,
     );
-    const initialThresholds = getEffectiveThresholds(config, context.model?.contextWindow);
+    const initialPolicy = resolveContextThresholds({
+      profile: config.contextProfile,
+      logicalContextWindow: normalizePositiveWindow(context.model?.contextWindow),
+      effectiveContextBudget: config.effectiveContextBudgetTokens,
+      softWarningTokens: config.softWarningTokens,
+      compactThresholdTokens: config.compactThresholdTokens,
+      hardCeilingTokens: config.hardCeilingTokens,
+      keepRecentTokens: config.keepRecentTokens,
+    });
     gate = new CompactionGate({
-      rearmTokens: getRearmTokens(initialThresholds.softWarningTokens, initialThresholds.compactThresholdTokens),
+      rearmTokens: getRearmTokens(initialPolicy.thresholds.softWarningTokens, initialPolicy.thresholds.compactThresholdTokens),
+      workingContextBudget: initialPolicy.workingContextBudget ?? undefined,
     });
     warned.value = false;
     turnSerial = 0;
@@ -852,8 +927,10 @@ export default function (pi: ExtensionAPI): void {
       activeToolOutputTokens,
       tokenSource,
     );
-    const thresholds = resolveThresholds(context, config, telemetry);
+    const policy = resolvePolicy(context, config, telemetry);
+    const thresholds = policy.thresholds;
     gate.setRearmTokens(getRearmTokens(thresholds.softWarningTokens, thresholds.compactThresholdTokens));
+    gate.setWorkingContextBudget(policy.workingContextBudget);
     gate.complete(postTokens, turnSerial);
     requestedCompaction = undefined;
     if (pending?.reason === "semantic" || event.reason === "manual") {
@@ -862,7 +939,7 @@ export default function (pi: ExtensionAPI): void {
       semanticCompactionDeferredNotified = false;
     }
     warned.value = false;
-    updateStatus(context, config, telemetry, thresholds);
+    updateStatus(context, config, telemetry, policy);
     debugLog(config, `compaction completed (${event.reason})`);
   });
 
@@ -991,7 +1068,7 @@ export default function (pi: ExtensionAPI): void {
       event,
       context,
       config,
-      resolveThresholds(context, config, telemetry),
+      resolvePolicy(context, config, telemetry).thresholds,
       evidenceTracker.hasReducedSinceLastCompaction,
     );
   });
@@ -1068,7 +1145,7 @@ export default function (pi: ExtensionAPI): void {
 
   const reportContextStats = async (_args: string, context: ExtensionCommandContext) => {
     const observed = observeContext(context, config, telemetry, gate);
-    const snapshot = telemetry.snapshot(observed.thresholds.compactThresholdTokens);
+    const snapshot = telemetry.snapshot(observed.thresholds.compactThresholdTokens, observed.policy);
 
     const embeddedAvailable = getInteropProvider(LCM_EMBEDDED_CONTEXT_PROVIDER_NAME) !== undefined;
     let fabricStatus = "unavailable";
@@ -1129,9 +1206,14 @@ export default function (pi: ExtensionAPI): void {
       `Reduced outputs since compaction: ${evidenceTracker.reducedSinceLastCompactionCount}`,
       `Recovery copies pruned: ${getSessionRecoveryStorage(currentSessionId).prunedFileCount}`,
       `Context mode: ${contextModeSummary()}`,
+      `Logical model window: ${observed.policy.logicalContextWindow === null ? "not reported" : `${Math.round(observed.policy.logicalContextWindow).toLocaleString()} tokens`}`,
+      `Effective working budget: ${observed.policy.workingContextBudget === null ? "legacy fallback (not reported)" : `${Math.round(observed.policy.workingContextBudget).toLocaleString()} tokens`}`,
+      `Working budget source: ${observed.policy.workingContextBudgetSource === "effective-context-budget" ? (config.effectiveContextBudgetTokens !== undefined ? "configured effective budget" : "runtime effective budget") : observed.policy.workingContextBudgetSource === "logical-context-window" ? "model context window" : "legacy profile fallback"}`,
       `Effective thresholds: ${formatThresholdSummary(observed.thresholds)}`,
       `Soft warning: ${observed.thresholds.softWarningTokens.toLocaleString()} tokens`,
       `Hard ceiling: ${observed.thresholds.hardCeilingTokens.toLocaleString()} tokens`,
+      "Threshold policy:",
+      ...formatThresholdSources(observed.policy),
       `Enabled: ${config.enabled ? "yes" : "no"}`,
       `Current reading: ${observed.tokens === null ? "unknown" : `${Math.round(observed.tokens).toLocaleString()} tokens`}`,
     ].join("\n");
@@ -1159,11 +1241,11 @@ export default function (pi: ExtensionAPI): void {
       const usage = "Usage: /context-mode [aggressive|balanced|relaxed|reset]";
       if (!requested) {
         const observed = observeContext(context, config, telemetry, gate);
-        const snapshot = telemetry.snapshot(observed.thresholds.compactThresholdTokens);
         const details = [
           `Context mode: ${contextModeSummary()}`,
           `Effective thresholds: ${formatThresholdSummary(observed.thresholds)}`,
-          `Context window: ${snapshot.contextWindow === null ? "not reported" : `${Math.round(snapshot.contextWindow).toLocaleString()} tokens`}`,
+          `Logical model window: ${observed.policy.logicalContextWindow === null ? "not reported" : `${Math.round(observed.policy.logicalContextWindow).toLocaleString()} tokens`}`,
+          `Effective working budget: ${observed.policy.workingContextBudget === null ? "legacy fallback" : `${Math.round(observed.policy.workingContextBudget).toLocaleString()} tokens`}`,
         ].join("\n");
         if (context.hasUI) {
           context.ui.notify(details, "info");
@@ -1214,16 +1296,15 @@ export default function (pi: ExtensionAPI): void {
       config = {
         ...fileConfig,
         contextProfile: profile,
-        ...CONTEXT_PROFILE_THRESHOLDS[profile],
       };
       warned.value = false;
       const observed = observeContext(context, config, telemetry, gate);
-      const snapshot = telemetry.snapshot(observed.thresholds.compactThresholdTokens);
       const details = [
         `Context mode set to ${profile} for this session.`,
         `Effective thresholds: ${formatThresholdSummary(observed.thresholds)}`,
-        `Context window: ${snapshot.contextWindow === null ? "not reported" : `${Math.round(snapshot.contextWindow).toLocaleString()} tokens`}`,
-        "Thresholds you set in pi-local-context-manager.json are replaced for this session; /context-mode reset restores them.",
+        `Logical model window: ${observed.policy.logicalContextWindow === null ? "not reported" : `${Math.round(observed.policy.logicalContextWindow).toLocaleString()} tokens`}`,
+        `Effective working budget: ${observed.policy.workingContextBudget === null ? "legacy fallback" : `${Math.round(observed.policy.workingContextBudget).toLocaleString()} tokens`}`,
+        "The active ratio profile changes for this session; explicit token overrides from pi-local-context-manager.json remain active. /context-mode reset restores the configured profile.",
         `To make it persistent, set \"contextProfile\": \"${profile}\" in pi-local-context-manager.json.`,
       ].join("\n");
       if (context.hasUI) {
@@ -1260,11 +1341,12 @@ export default function (pi: ExtensionAPI): void {
         return;
       }
       const paths = pathSettings ?? (await getPiPathSettings());
+      const policy = resolvePolicy(context, config, telemetry);
       await runCheckpointReset(args, context, {
         config,
         agentDir: paths.agentDir,
         runCommand: runPiCommand,
-        previousResetCount: telemetry.snapshot(config.compactThresholdTokens).checkpointResets,
+        previousResetCount: telemetry.snapshot(policy.thresholds.compactThresholdTokens, policy).checkpointResets,
       });
     },
   });

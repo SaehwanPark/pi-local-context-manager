@@ -2,6 +2,19 @@
 
 All notable changes to `pi-local-context-manager` are documented here. Version numbers also mark the project milestones represented by the merged pull requests.
 
+## [0.5.2] - 2026-09-14
+
+### Added
+
+- **Adaptive working-budget policy**: Profile boundaries now scale with the usable context budget (40/50/65% aggressive, 52.5/65/80% balanced, and 62.5/75/87.5% relaxed) instead of stopping at fixed token counts on large-context models.
+- **Effective budget override**: Added `effectiveContextBudgetTokens` so local runtimes can constrain an advertised model window without changing the logical model capacity.
+- **Threshold provenance and diagnostics**: `/context-stats` now reports logical and effective budgets, budget consumption, profile ratios, explicit overrides, safety clamps, and post-compaction slack.
+- **Shared root/embedded resolver**: Root and embedded controllers use the same adaptive threshold resolver, including small-window response headroom and bounded recent-context retention.
+
+### Compatibility
+
+- Existing numeric token settings remain absolute overrides. Profile-only configuration now intentionally adapts to the active working budget; when no budget is reported, the previous v0.5.1 profile values remain the fallback.
+
 ## [0.5.1] - 2026-09-13
 
 ### Changed
@@ -211,6 +224,7 @@ Initial extension milestone delivered by [PR #1](https://github.com/SaehwanPark/
 - Reviewed `/handoff <objective>` continuation prompts and fresh-session initialization.
 - Package metadata, examples, tests, and build/typecheck configuration.
 
+[0.5.2]: https://github.com/SaehwanPark/pi-local-context-manager/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/SaehwanPark/pi-local-context-manager/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/SaehwanPark/pi-local-context-manager/compare/v0.4.3...v0.5.0
 [0.4.3]: https://github.com/SaehwanPark/pi-local-context-manager/compare/v0.4.2...v0.4.3

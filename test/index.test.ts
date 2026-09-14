@@ -114,7 +114,7 @@ describe("extension integration", () => {
   it("switches context mode for the current session", async () => {
     const harness = makeExtensionHarness();
     let compactCalls = 0;
-    const context = contextWithUsage(25_000, 64_000, compactionHistory());
+    const context = contextWithUsage(35_000, 64_000, compactionHistory());
     context.compact = () => {
       compactCalls += 1;
     };
@@ -184,6 +184,9 @@ describe("extension integration", () => {
     await statsCommand?.("", mockContext);
     expect(notifyMessage).toContain("Context mode: balanced (pi-local-context-manager.json)");
     expect(notifyMessage).toContain("Recovery copies pruned: 0");
+    expect(notifyMessage).toContain("Logical model window: 64,000 tokens");
+    expect(notifyMessage).toContain("Effective working budget: 64,000 tokens");
+    expect(notifyMessage).toContain("Threshold policy:");
 
     const modeCommand = harness.commands.get("context-mode")?.handler;
     await modeCommand?.("aggressive", mockContext);
@@ -192,6 +195,7 @@ describe("extension integration", () => {
     expect(notifyMessage).toContain(
       "Context mode: aggressive (session override; /context-mode reset restores pi-local-context-manager.json)",
     );
+    expect(notifyMessage).toContain("compact: aggressive ratio (50%)");
   });
 
   it("queues a reset recommendation without switching sessions", async () => {
@@ -227,7 +231,7 @@ describe("extension integration", () => {
   it("lowers the proactive threshold for a constrained context window", async () => {
     const harness = makeExtensionHarness();
     let compactCalls = 0;
-    const context = contextWithUsage(17_000, 32_000, compactionHistory());
+    const context = contextWithUsage(22_000, 32_000, compactionHistory());
     context.compact = () => {
       compactCalls += 1;
     };
@@ -266,7 +270,7 @@ describe("extension integration", () => {
   it("does not let an unrelated native failure disable proactive requests", async () => {
     const harness = makeExtensionHarness();
     let compactCalls = 0;
-    const context = contextWithUsage(32_000, 64_000, compactionHistory());
+    const context = contextWithUsage(45_000, 64_000, compactionHistory());
     context.compact = () => {
       compactCalls += 1;
     };
@@ -281,7 +285,7 @@ describe("extension integration", () => {
   it("keeps later turns alive when asynchronous compaction fails", async () => {
     const harness = makeExtensionHarness();
     let compactCalls = 0;
-    const context = contextWithUsage(32_000, 64_000, compactionHistory());
+    const context = contextWithUsage(45_000, 64_000, compactionHistory());
     context.compact = (options?: CompactOptions): void => {
       compactCalls += 1;
       queueMicrotask(() => options?.onError?.(new Error("transient compaction failure")));
@@ -373,7 +377,7 @@ describe("extension integration", () => {
   it("isolates a settled compaction when the session is replaced", async () => {
     const harness = makeExtensionHarness();
     let firstOptions: CompactOptions | undefined;
-    const firstContext = contextWithUsage(32_000, 64_000, compactionHistory());
+    const firstContext = contextWithUsage(45_000, 64_000, compactionHistory());
     firstContext.compact = (options?: CompactOptions): void => {
       firstOptions = options;
     };
@@ -394,7 +398,7 @@ describe("extension integration", () => {
     const harness = makeExtensionHarness();
     let compactCalls = 0;
     let secondOptions: CompactOptions | undefined;
-    const firstContext = contextWithUsage(32_000, 64_000, compactionHistory());
+    const firstContext = contextWithUsage(45_000, 64_000, compactionHistory());
     firstContext.compact = () => {
       compactCalls += 1;
     };
@@ -463,7 +467,7 @@ describe("extension integration", () => {
     let compactCalls = 0;
     let firstOptions: CompactOptions | undefined;
     let secondOptions: CompactOptions | undefined;
-    const firstContext = contextWithUsage(32_000, 64_000, compactionHistory());
+    const firstContext = contextWithUsage(45_000, 64_000, compactionHistory());
     firstContext.compact = (options?: CompactOptions): void => {
       compactCalls += 1;
       firstOptions = options;
@@ -473,7 +477,7 @@ describe("extension integration", () => {
     const turnStart = harness.handlers.get("turn_start")?.[0];
     await turnEnd?.({}, firstContext);
 
-    const secondContext = contextWithUsage(32_000, 64_000, compactionHistory());
+    const secondContext = contextWithUsage(45_000, 64_000, compactionHistory());
     secondContext.compact = (options?: CompactOptions): void => {
       compactCalls += 1;
       secondOptions = options;
@@ -500,7 +504,7 @@ describe("extension integration", () => {
   it("requests one proactive compaction at a safe boundary", async () => {
     const harness = makeExtensionHarness();
     let compactCalls = 0;
-    const context = contextWithUsage(32_000, 64_000, compactionHistory());
+    const context = contextWithUsage(45_000, 64_000, compactionHistory());
     context.compact = () => {
       compactCalls += 1;
     };
@@ -534,6 +538,27 @@ describe("extension integration", () => {
     await turnStart?.({}, context);
     await turnEnd?.({}, context);
     expect(compactCalls).toBe(2);
+  });
+
+  it("uses a runtime effective budget instead of the advertised model window", async () => {
+    const harness = makeExtensionHarness();
+    let compactCalls = 0;
+    const context = {
+      ...contextWithUsage(35_000, 128_000, compactionHistory()),
+      getContextUsage: () => ({
+        tokens: 35_000,
+        contextWindow: 128_000,
+        percent: 50,
+        effectiveContextBudget: 48_000,
+      }),
+      compact: () => {
+        compactCalls += 1;
+      },
+    };
+
+    const turnEnd = harness.handlers.get("turn_end")?.[0];
+    await turnEnd?.({}, context);
+    expect(compactCalls).toBe(1);
   });
 
   it("bypasses custom compaction for overflow compaction and non-semantic threshold compactions", async () => {

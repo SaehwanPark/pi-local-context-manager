@@ -7,7 +7,7 @@ description: Release history and installation links for pi-local-context-manager
 
 [Documentation portal]({{ '/' | relative_url }}) · [Installation & first launch]({{ '/guides/installation.html' | relative_url }}) · [GitHub changelog](https://github.com/SaehwanPark/pi-local-context-manager/blob/main/CHANGELOG.md)
 
-The current source release is **`{{ site.version }}`**. GitHub and the Pages site document v0.5.1. While npm package deployment is pending trusted-publishing configuration, installing directly from GitHub via `git:...` is recommended by default.
+The current source release is **`{{ site.version }}`**. GitHub and the Pages site document v0.5.2. While npm package deployment is pending trusted-publishing configuration, installing directly from GitHub via `git:...` is recommended by default.
 
 ## Install the current release
 
@@ -17,10 +17,10 @@ Install directly from GitHub:
 pi install git:github.com/SaehwanPark/pi-local-context-manager
 ```
 
-To pin a specific release version (for example `v0.5.1`):
+To pin a specific release version (for example `v0.5.2`):
 
 ```bash
-pi install git:github.com/SaehwanPark/pi-local-context-manager#v0.5.1
+pi install git:github.com/SaehwanPark/pi-local-context-manager#v0.5.2
 ```
 
 - [GitHub repository](https://github.com/SaehwanPark/pi-local-context-manager)
@@ -31,6 +31,7 @@ pi install git:github.com/SaehwanPark/pi-local-context-manager#v0.5.1
 
 | Version | Milestone | Highlights |
 | --- | --- | --- |
+| **0.5.2** | Adaptive context threshold policy | Profile ratios scale with the usable working budget, effective runtime budgets constrain larger advertised windows, and `/context-stats` reports threshold provenance and post-compaction slack. |
 | **0.5.1** | Rebrand to pi-local-context-manager | Project rebranded to `pi-local-context-manager` across directory, repository, and documentation to align with companion Pi ecosystem projects. |
 | **0.5.0** | Comprehensive resilience hardening (R1-R3 audit) | Over-threshold compaction hysteresis, session-addressable manifest recovery with lease refresh, lazy interop querying with AbortSignal cancellation, correlated semantic compaction, and safe tool-output recovery. |
 | **0.4.3** | Joint audit hardening | Provider-owned quiescence, recovery-safe embedded deactivation, strict snapshot validation, and session-scoped safe-agent fabrics. |

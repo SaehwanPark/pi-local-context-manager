@@ -37,9 +37,7 @@ Later project values override global values. You may either put settings at the 
 {
   "piLocalContextManager": {
     "contextProfile": "balanced",
-    "toolOutputReduction": true,
-    "softWarningTokens": 24000,
-    "compactThresholdTokens": 32000
+    "toolOutputReduction": true
   }
 }
 ```
@@ -51,11 +49,12 @@ After editing a file, start a new Pi session or run `/reload`.
 | Setting | Default | What it controls |
 | --- | ---: | --- |
 | `enabled` | `true` | Master switch for extension behavior. |
-| `contextProfile` | `balanced` | Semantic threshold bundle: `aggressive`, `balanced`, or `relaxed`. Numeric settings below can override individual values. |
-| `softWarningTokens` | `24000` | Advanced override for the warning boundary after a compaction cycle. |
-| `compactThresholdTokens` | `32000` | Advanced override for a guarded proactive compaction request at an idle boundary. |
-| `hardCeilingTokens` | `48000` | Advanced override for the status boundary; Pi still owns emergency compaction. |
-| `keepRecentTokens` | `10000` | Advanced override for the recent-context target used during explicit semantic deep compaction. Routine proactive and overflow compactions deliberately preserve Pi's native preparation. |
+| `contextProfile` | `balanced` | Ratio policy: `aggressive`, `balanced`, or `relaxed`. Numeric settings below can override individual values. |
+| `softWarningTokens` | unset | Explicit token override for the warning boundary. Unset uses the selected profile ratio. |
+| `compactThresholdTokens` | unset | Explicit token override for guarded proactive compaction. Unset uses the selected profile ratio. |
+| `hardCeilingTokens` | unset | Explicit token override for the status boundary; Pi still owns emergency compaction. |
+| `keepRecentTokens` | unset | Explicit recent-context target for semantic deep compaction. Unset uses the profile cap and a 12.5% budget bound. |
+| `effectiveContextBudgetTokens` | unset | Optional runtime-safe working budget. It constrains proactive policy without changing the advertised model window. |
 | `toolOutputReduction` | `true` | Allows reduction of eligible newly arriving oversized tool results. |
 | `semanticCompaction` | `true` | Enables `request_context_compaction` and `/compact-phase`. |
 | `handoff` | `true` | Enables `/handoff <objective>`. |
@@ -63,25 +62,35 @@ After editing a file, start a new Pi session or run `/reload`.
 | `checkpointDirectory` | `null` | Alternate local root for checkpoint archives. `null` uses Pi's agent directory. |
 | `debug` | `false` | Writes diagnostic messages to stderr. |
 
-The three compaction thresholds must be positive integers in this order:
+Explicit numeric thresholds must be positive integers in this order:
 
 ```text
 keepRecentTokens < softWarningTokens < compactThresholdTokens < hardCeilingTokens
 ```
 
-For example, the default `keepRecentTokens` is lower than the warning threshold, and the warning threshold is lower than the proactive compaction threshold. If you provide an invalid number or ordering, the extension keeps the prior valid value and shows a configuration warning.
+For example, the resolved profile `keepRecentTokens` is lower than the warning threshold, and the warning threshold is lower than the proactive compaction threshold. If you provide an invalid number or ordering, the extension keeps the prior valid value and shows a configuration warning.
 
 ## Profiles and automatic adaptation
 
-Profiles keep the four thresholds coherent:
+Profiles describe how much of the usable working context LCM should consume:
 
-| Profile | Use it when | Nominal thresholds (keep / warn / compact / ceiling) |
-| --- | --- | ---: |
-| `aggressive` | Long sessions become noticeably slower | `8k / 16k / 24k / 36k` |
-| `balanced` | Normal starting point; this is the default | `10k / 24k / 32k / 48k` |
-| `relaxed` | Compaction happens too often and long prompts remain comfortable | `12k / 36k / 48k / 72k` |
+| Profile | Warning | Proactive compact | Hard ceiling | Keep-recent cap |
+| --- | ---: | ---: | ---: | ---: |
+| `aggressive` | 40% | 50% | 65% | 8k |
+| `balanced` | 52.5% | 65% | 80% | 10k |
+| `relaxed` | 62.5% | 75% | 87.5% | 12k |
 
-The extension also reads the model's reported context-window size. For a constrained window, it lowers thresholds to conservative fractions of that window (approximately 12.5% / 25% / 50% / 75%). It never scales them up because a model advertises a large window. If the window is unavailable, the configured profile and numeric values are used as-is. Numeric overrides remain advanced values, but they are also lowered when necessary to fit a constrained window.
+The extension separates three values:
+
+```text
+model context window  = logical capacity advertised by the model/runtime
+working budget        = effective usable capacity for LCM policy
+threshold             = profile ratio or explicit token boundary
+```
+
+The working budget prefers a configured/runtime effective budget and otherwise uses the logical model window. If neither is available, the previous profile values remain the conservative fallback. For example, a 128k model with `effectiveContextBudgetTokens: 80000` uses a balanced compact boundary of about 52k and a hard ceiling of about 64k, rather than blindly using 65% and 80% of 128k.
+
+Automatic compact thresholds leave a minimum response reserve on small windows. Explicit token overrides remain absolute and meaningful; when a requested value cannot fit the effective budget, it is safely clamped and `/context-stats` reports the clamp source.
 
 Use the guided command for the current session:
 
@@ -119,6 +128,15 @@ For a specialized setup, numeric settings can override a profile bundle:
 }
 ```
 
+If the model advertises more context than the local runtime can comfortably prefill, set an effective working budget while retaining the model's logical window:
+
+```json
+{
+  "contextProfile": "balanced",
+  "effectiveContextBudgetTokens": 80000
+}
+```
+
 If you only need to turn off one behavior, use a small project override instead:
 
 ```json
@@ -139,7 +157,7 @@ Start with `balanced` and let the extension work in the background. Choose by sy
 - **Everything feels comfortable:** keep `balanced`.
 - **Compaction happens too often even though long prompts remain fast:** use `relaxed`.
 
-Run `/context-stats` to see the active mode and effective thresholds. The values are token counts, not percentages of every model's window. Hardware, runtime, model, quantization, and caching all affect performance, so this release does not assign thresholds from a machine lookup table.
+Run `/context-stats` to see the active mode, logical model window, working budget, effective thresholds, and provenance for each boundary. Hardware, runtime, model, quantization, and caching all affect performance, so this release does not assign thresholds from a machine lookup table.
 
 Use the four numeric fields only when measuring a specialized setup. Keep `keepRecentTokens` below the other thresholds, and treat `hardCeilingTokens` as a status boundary rather than a setting that forces a reset. The extension does not yet learn a performance knee or retune itself from latency measurements.
 

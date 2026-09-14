@@ -3,8 +3,9 @@ export const MIN_COMPACTION_GROWTH_MARGIN = 1_500;
 
 export interface CompactionGateOptions {
   rearmTokens: number;
-  minimumTurnGap?: number;
-  growthMargin?: number;
+  minimumTurnGap?: number | undefined;
+  growthMargin?: number | undefined;
+  workingContextBudget?: number | undefined;
 }
 
 /**
@@ -19,7 +20,8 @@ export interface CompactionGateOptions {
 export class CompactionGate {
   private rearmTokens: number;
   private readonly minimumTurnGap: number;
-  private readonly growthMargin: number;
+  private readonly explicitGrowthMargin: number | null;
+  private growthMargin: number;
   private armed = true;
   private inFlight = false;
   private lastRequestTurn: number | null = null;
@@ -31,8 +33,20 @@ export class CompactionGate {
     this.rearmTokens = Number.isFinite(options.rearmTokens) ? Math.max(1, options.rearmTokens) : 1;
     const minimumTurnGap = options.minimumTurnGap ?? MIN_COMPACTION_TURN_GAP;
     this.minimumTurnGap = Number.isFinite(minimumTurnGap) ? Math.max(0, Math.floor(minimumTurnGap)) : MIN_COMPACTION_TURN_GAP;
-    const growthMargin = options.growthMargin ?? MIN_COMPACTION_GROWTH_MARGIN;
-    this.growthMargin = Number.isFinite(growthMargin) ? Math.max(500, Math.floor(growthMargin)) : MIN_COMPACTION_GROWTH_MARGIN;
+    const growthMargin = options.growthMargin;
+    this.explicitGrowthMargin = growthMargin === undefined
+      ? null
+      : Number.isFinite(growthMargin)
+        ? Math.max(500, Math.floor(growthMargin))
+        : MIN_COMPACTION_GROWTH_MARGIN;
+    this.growthMargin = this.explicitGrowthMargin ?? getDefaultGrowthMargin(options.workingContextBudget);
+  }
+
+  setWorkingContextBudget(workingContextBudget: number | null | undefined): void {
+    if (this.explicitGrowthMargin !== null) {
+      return;
+    }
+    this.growthMargin = getDefaultGrowthMargin(workingContextBudget);
   }
 
   setRearmTokens(rearmTokens: number): void {
@@ -139,4 +153,14 @@ export function shouldTriggerThresholdCompaction(tokens: number | null, threshol
 export function getRearmTokens(softWarningTokens: number, compactThresholdTokens: number): number {
   const threeQuarterThreshold = Math.floor(compactThresholdTokens * 0.75);
   return Math.max(1, Math.min(softWarningTokens, threeQuarterThreshold));
+}
+
+function getDefaultGrowthMargin(workingContextBudget: number | null | undefined): number {
+  if (typeof workingContextBudget !== "number" || !Number.isFinite(workingContextBudget) || workingContextBudget <= 0) {
+    return MIN_COMPACTION_GROWTH_MARGIN;
+  }
+  // Keep the long-standing absolute floor while making hysteresis meaningful
+  // on large working budgets. The cap prevents an unusually large model window
+  // from requiring an impractical amount of growth before rearming.
+  return Math.min(16_384, Math.max(MIN_COMPACTION_GROWTH_MARGIN, Math.floor(workingContextBudget * 0.03)));
 }

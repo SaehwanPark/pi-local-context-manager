@@ -5,6 +5,7 @@ import {
   formatTelemetryStatus,
   formatTokenSourceDescription,
 } from "../src/telemetry.js";
+import { resolveContextThresholds } from "../src/config.js";
 
 describe("telemetry", () => {
   it("tracks context growth after compaction and reduced tool output", () => {
@@ -54,5 +55,32 @@ describe("telemetry", () => {
     expect(formatTokenSourceDescription("local-fallback")).toBe("local fallback estimate");
     expect(formatTokenSourceDescription("estimated")).toBe("local fallback estimate");
     expect(formatTokenSourceDescription("unknown")).toBe("unknown");
+  });
+
+  it("reports working-budget consumption and post-compaction slack", () => {
+    const telemetry = new ContextTelemetry();
+    telemetry.observe({
+      tokens: 61_200,
+      contextWindow: 128_000,
+      effectiveContextBudget: 96_000,
+    });
+    telemetry.markCompaction(1, 1, 24_000, 0);
+    telemetry.observe({
+      tokens: 61_200,
+      contextWindow: 128_000,
+      effectivePrefillBudget: 96_000,
+    });
+    const policy = resolveContextThresholds({
+      profile: "balanced",
+      logicalContextWindow: 128_000,
+      effectiveContextBudget: 96_000,
+    });
+    const snapshot = telemetry.snapshot(policy.thresholds.compactThresholdTokens, policy);
+    expect(snapshot.workingContextBudget).toBe(96_000);
+    expect(snapshot.percentOfWorkingBudget).toBeCloseTo(63.75);
+    expect(snapshot.epochSlackTokens).toBe(policy.thresholds.compactThresholdTokens - 24_000);
+    expect(formatTelemetryStatus(snapshot)).toContain("ctx 61k/96k");
+    expect(formatTelemetryDetails(snapshot)).toContain("Effective working budget:");
+    expect(formatTelemetryDetails(snapshot)).toContain("Post-compaction slack");
   });
 });

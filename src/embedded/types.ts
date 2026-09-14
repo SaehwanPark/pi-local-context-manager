@@ -1,5 +1,5 @@
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
-import type { LocalContextManagerConfig } from "../config.js";
+import type { LocalContextManagerConfig, ThresholdSources } from "../config.js";
 import type { SessionRecoveryStorage, ToolContentBlock } from "../tool-output.js";
 
 export type EmbeddedContextUsageSource =
@@ -31,8 +31,15 @@ export interface EmbeddedContextSnapshot {
   contextWindow: number | null;
   logicalContextWindow?: number | null;
   effectiveContextBudget?: number | null;
+  workingContextBudget: number | null;
+  workingContextBudgetSource: "effective-context-budget" | "logical-context-window" | "fallback";
+  percentOfWorkingBudget: number | null;
   tokenSource: "pi-estimate" | "local-fallback" | "reported" | "estimated" | "unknown";
+  softWarningTokens: number;
   compactThresholdTokens: number;
+  hardCeilingTokens: number;
+  keepRecentTokens: number;
+  thresholdSources: ThresholdSources;
   percentOfThreshold: number | null;
   thresholdRatio?: number | undefined;
   mode: "root" | "managed-child";

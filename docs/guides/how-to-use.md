@@ -35,7 +35,7 @@ If compaction feels too frequent while long prompts remain comfortable, choose:
 /context-mode relaxed
 ```
 
-Use `/context-mode balanced` to return to the default. The command applies only to the current session; set `contextProfile` in the configuration file when you want the choice to persist. Pi's reported model context window can lower thresholds automatically for small-window models, so you do not need to calculate fractions yourself.
+Use `/context-mode balanced` to return to the default. The command applies only to the current session; set `contextProfile` in the configuration file when you want the choice to persist. Profiles scale with the usable working budget, and small windows automatically retain response headroom, so you do not need to calculate fractions yourself.
 
 ### 3. Keep working until a meaningful phase ends
 
@@ -120,7 +120,7 @@ The default storage location is outside the repository:
 
 - **Tool-output reduction:** eligible oversized new results can be shortened. Source reads and small results are preserved. The replacement includes a recovery path when one is available; open that file when you need the full output.
 - **Proactive compaction:** once the threshold is reached, a request may run at a safe idle boundary. Hysteresis, cooldown, and an in-flight gate prevent repeated compaction attempts.
-- **Adaptive thresholds:** the active profile is automatically lowered for constrained reported context windows, but never raised for a large advertised window.
+- **Adaptive thresholds:** the active profile scales with the usable working budget. A configured/runtime effective budget can constrain a larger advertised window, and small windows retain response headroom.
 - **Telemetry:** status and `/context-stats` update as usage, compactions, and reductions change.
 
 If an optional operation fails, the extension prefers the original context and reports the failure rather than silently dropping work.

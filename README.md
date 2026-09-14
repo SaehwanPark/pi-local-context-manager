@@ -14,10 +14,10 @@ Install the extension directly from GitHub by default:
 pi install git:github.com/SaehwanPark/pi-local-context-manager
 ```
 
-To pin a specific release version (e.g., `v0.5.1`):
+To pin a specific release version (e.g., `v0.5.2`):
 
 ```bash
-pi install git:github.com/SaehwanPark/pi-local-context-manager#v0.5.1
+pi install git:github.com/SaehwanPark/pi-local-context-manager#v0.5.2
 ```
 
 Start (or reload) Pi in your project, then try:
@@ -31,7 +31,7 @@ The extension works with Pi's existing models and configuration. It does not ins
 ## What it adds
 
 - telemetry for context size, compaction, and reduced tool output;
-- balanced-by-default context profiles (`aggressive`, `balanced`, `relaxed`) with automatic downward adaptation for small model windows;
+- balanced-by-default context profiles (`aggressive`, `balanced`, `relaxed`) that scale with the usable model/runtime budget;
 - guarded proactive compaction at safe idle boundaries;
 - conservative reduction of only new oversized tool results, with a recovery path;
 - intentional phase compaction with `/compact-phase` that defers while delegated child agents are active;

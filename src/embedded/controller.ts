@@ -1,8 +1,9 @@
 import {
   DEFAULT_CONFIG,
-  getEffectiveThresholds,
+  resolveContextThresholds,
   type ContextThresholds,
   type LocalContextManagerConfig,
+  type ResolvedContextPolicy,
 } from "../config.js";
 import {
   EvidenceReductionTracker,
@@ -69,26 +70,37 @@ export class EmbeddedContextController implements EmbeddedContextManager {
     }
 
     this.config = baseConfig;
-    const logicalContextWindow = positiveFinite(options.logicalContextWindow ?? options.contextWindow);
-    const effectiveContextBudget = positiveFinite(options.effectivePrefillBudget ?? options.effectiveContextBudget);
+    const logicalContextWindow = positiveFinite(options.logicalContextWindow) ?? positiveFinite(options.contextWindow);
+    const effectiveContextBudget = minPositive(
+      options.effectivePrefillBudget,
+      options.effectiveContextBudget,
+      baseConfig.effectiveContextBudgetTokens,
+    );
     this.currentContextWindow = logicalContextWindow ?? null;
     this.currentEffectiveContextBudget = clampEffectiveBudget(effectiveContextBudget === null ? undefined : effectiveContextBudget, logicalContextWindow === null ? undefined : logicalContextWindow);
-    const initialThresholds = getEffectiveThresholds(
-      this.config,
-      this.currentEffectiveContextBudget ?? this.currentContextWindow ?? this.config.compactThresholdTokens * 2,
-    );
+    const initialPolicy = this.resolvePolicy();
     this.gate = new CompactionGate({
-      rearmTokens: getRearmTokens(initialThresholds.softWarningTokens, initialThresholds.compactThresholdTokens),
+      rearmTokens: getRearmTokens(initialPolicy.thresholds.softWarningTokens, initialPolicy.thresholds.compactThresholdTokens),
+      workingContextBudget: initialPolicy.workingContextBudget ?? undefined,
     });
 
     this.refreshUsage();
   }
 
+  private resolvePolicy(): ResolvedContextPolicy {
+    return resolveContextThresholds({
+      profile: this.config.contextProfile,
+      logicalContextWindow: this.currentContextWindow ?? undefined,
+      effectiveContextBudget: this.currentEffectiveContextBudget ?? this.config.effectiveContextBudgetTokens,
+      softWarningTokens: this.config.softWarningTokens,
+      compactThresholdTokens: this.config.compactThresholdTokens,
+      hardCeilingTokens: this.config.hardCeilingTokens,
+      keepRecentTokens: this.config.keepRecentTokens,
+    });
+  }
+
   private resolveThresholds(): ContextThresholds {
-    return getEffectiveThresholds(
-      this.config,
-      this.currentEffectiveContextBudget ?? this.currentContextWindow ?? undefined,
-    );
+    return this.resolvePolicy().thresholds;
   }
 
   private refreshUsage(): { tokens: number | null; thresholds: ContextThresholds } {
@@ -108,7 +120,15 @@ export class EmbeddedContextController implements EmbeddedContextManager {
     }
 
     const logicalContextWindow = positiveFinite(usage?.logicalContextWindow ?? usage?.contextWindow) ?? this.currentContextWindow;
-    const effectiveContextBudget = positiveFinite(usage?.effectivePrefillBudget ?? usage?.effectiveContextBudget) ?? this.currentEffectiveContextBudget;
+    const usageEffectiveCandidates = [usage?.effectiveContextBudget, usage?.effectivePrefillBudget]
+      .map(positiveFinite)
+      .filter((value): value is number => value !== undefined);
+    const hasUsageEffectiveValue = usage?.effectiveContextBudget !== undefined || usage?.effectivePrefillBudget !== undefined;
+    const effectiveContextBudget = usageEffectiveCandidates.length > 0
+      ? Math.min(...usageEffectiveCandidates)
+      : !hasUsageEffectiveValue
+      ? this.currentEffectiveContextBudget
+      : null;
     this.currentContextWindow = logicalContextWindow ?? null;
     this.currentEffectiveContextBudget = clampEffectiveBudget(effectiveContextBudget === null ? undefined : effectiveContextBudget, logicalContextWindow === null ? undefined : logicalContextWindow);
 
@@ -131,8 +151,10 @@ export class EmbeddedContextController implements EmbeddedContextManager {
       }
     }
 
-    const thresholds = this.resolveThresholds();
+    const policy = this.resolvePolicy();
+    const thresholds = policy.thresholds;
     this.gate.setRearmTokens(getRearmTokens(thresholds.softWarningTokens, thresholds.compactThresholdTokens));
+    this.gate.setWorkingContextBudget(policy.workingContextBudget);
     this.gate.observe(this.currentTokens, thresholds.compactThresholdTokens);
 
     try {
@@ -283,10 +305,15 @@ export class EmbeddedContextController implements EmbeddedContextManager {
   }
 
   snapshot(): EmbeddedContextSnapshot {
-    const thresholds = this.resolveThresholds();
+    const policy = this.resolvePolicy();
+    const thresholds = policy.thresholds;
     const percentOfThreshold =
       this.currentTokens !== null && thresholds.compactThresholdTokens > 0
         ? (this.currentTokens / thresholds.compactThresholdTokens) * 100
+        : null;
+    const percentOfWorkingBudget =
+      this.currentTokens !== null && policy.workingContextBudget !== null && policy.workingContextBudget > 0
+        ? (this.currentTokens / policy.workingContextBudget) * 100
         : null;
 
     return {
@@ -295,8 +322,15 @@ export class EmbeddedContextController implements EmbeddedContextManager {
       contextWindow: this.currentContextWindow,
       logicalContextWindow: this.currentContextWindow,
       effectiveContextBudget: this.currentEffectiveContextBudget,
+      workingContextBudget: policy.workingContextBudget,
+      workingContextBudgetSource: policy.workingContextBudgetSource,
+      percentOfWorkingBudget,
       tokenSource: this.currentTokenSource,
+      softWarningTokens: thresholds.softWarningTokens,
       compactThresholdTokens: thresholds.compactThresholdTokens,
+      hardCeilingTokens: thresholds.hardCeilingTokens,
+      keepRecentTokens: thresholds.keepRecentTokens,
+      thresholdSources: policy.sources,
       percentOfThreshold,
       thresholdRatio: percentOfThreshold !== null ? percentOfThreshold / 100 : undefined,
       mode: this.mode,
@@ -327,7 +361,16 @@ export class EmbeddedContextController implements EmbeddedContextManager {
 }
 
 function positiveFinite(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+  const normalized = Math.floor(value);
+  return normalized > 0 ? normalized : undefined;
+}
+
+function minPositive(...values: unknown[]): number | undefined {
+  const candidates = values.map(positiveFinite).filter((value): value is number => value !== undefined);
+  return candidates.length > 0 ? Math.min(...candidates) : undefined;
 }
 
 function clampEffectiveBudget(effective: number | undefined, logical: number | undefined): number | null {
