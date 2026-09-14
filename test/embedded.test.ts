@@ -52,7 +52,7 @@ describe("EmbeddedContextManager", () => {
   it("uses the effective prefill budget for proactive thresholds while retaining the logical window", async () => {
     const host = createMockHost({
       getContextUsage: vi.fn().mockReturnValue({
-        tokens: 28_000,
+        tokens: 35_000,
         contextWindow: 131_072,
         logicalContextWindow: 131_072,
         effectiveContextBudget: 48_000,
@@ -69,11 +69,44 @@ describe("EmbeddedContextManager", () => {
     expect(snapshot.logicalContextWindow).toBe(131_072);
     expect(snapshot.contextWindow).toBe(131_072);
     expect(snapshot.effectiveContextBudget).toBe(48_000);
-    // Balanced compact threshold is reduced from 32k to half of the 48k
-    // operational budget, so 28k crosses it; the logical 131k window would not.
-    expect(snapshot.compactThresholdTokens).toBe(24_000);
+    expect(snapshot.workingContextBudget).toBe(48_000);
+    expect(snapshot.softWarningTokens).toBe(25_200);
+    expect(snapshot.hardCeilingTokens).toBe(38_400);
+    expect(snapshot.thresholdSources.compact).toBe("profile-ratio");
+    // Balanced compact threshold follows 65% of the 48k operational budget,
+    // so the logical 131k window is not used for proactive policy.
+    expect(snapshot.compactThresholdTokens).toBe(31_200);
     await manager.observeSettled();
     expect(host.compact).toHaveBeenCalledTimes(1);
+  });
+
+  it("recalculates thresholds when the host model budget changes", () => {
+    let usage = {
+      tokens: 40_000,
+      contextWindow: 64_000,
+      source: "reported" as const,
+    };
+    const host = createMockHost({ getContextUsage: vi.fn(() => usage) });
+    const manager = createEmbeddedContextManager(host, { contextWindow: 64_000 });
+
+    expect(manager.snapshot().compactThresholdTokens).toBe(41_600);
+
+    usage = {
+      tokens: 60_000,
+      contextWindow: 128_000,
+      source: "reported" as const,
+    };
+    manager.observeTurnStart();
+    expect(manager.snapshot().compactThresholdTokens).toBe(83_200);
+    expect(manager.snapshot().workingContextBudget).toBe(128_000);
+
+    usage = {
+      tokens: 20_000,
+      contextWindow: 32_000,
+      source: "reported" as const,
+    };
+    manager.observeTurnStart();
+    expect(manager.snapshot().compactThresholdTokens).toBe(20_800);
   });
 
   it("falls back to character estimation from entries when host token usage is absent", () => {

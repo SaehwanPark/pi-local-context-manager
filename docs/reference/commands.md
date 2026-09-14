@@ -13,7 +13,7 @@ Type these commands into Pi's editor. The extension registers them when the pack
 
 | Command | Use it for | Does it change the session? |
 | --- | --- | --- |
-| `/context-stats` | View context reading/estimate, active mode, effective thresholds, reductions, and compaction history | No. It only reports telemetry. |
+| `/context-stats` | View context reading/estimate, logical model window, working budget, threshold provenance, reductions, and compaction history | No. It only reports telemetry. |
 | `/context-mode [profile]` | Show the current mode or choose `aggressive`, `balanced`, or `relaxed` for this session | It changes this session's policy only; it does not edit a file. |
 | `/compact-phase [reason]` | Compact after a meaningful phase, such as `tests pass` or `implementation complete` | It may add Pi's normal compaction entry after Pi is idle. |
 | `/handoff <objective>` | Begin a fresh session focused on a new objective | Only after you review the generated prompt and the new-session transition succeeds. |
@@ -71,7 +71,7 @@ Find local archives:
 
 Reasons are short labels for the generated summary and filename. Do not put secrets in a reason; checkpoint content can already contain sensitive project details.
 
-`aggressive` is for sluggish growing sessions, `balanced` is the default, and `relaxed` is for sessions that compact more often than needed. Pi's reported context-window size can lower any of these profiles for constrained models, but it never raises them automatically.
+`aggressive` is for sluggish growing sessions, `balanced` is the default, and `relaxed` is for sessions that compact more often than needed. Profiles scale with the usable working budget; a configured/runtime effective budget can constrain a larger advertised window, and small windows retain response headroom.
 
 ## Model-facing tools
 

@@ -147,4 +147,24 @@ describe("compaction policy", () => {
     expect(getRearmTokens(24_000, 32_000)).toBe(24_000);
     expect(getRearmTokens(40_000, 32_000)).toBe(24_000);
   });
+
+  it("scales default growth hysteresis with the working budget", () => {
+    const gate = new CompactionGate({ rearmTokens: 50_000, workingContextBudget: 128_000 });
+    gate.request(1);
+    gate.complete(60_000, 1);
+    gate.observe(63_500);
+    // 3% of 128k is larger than the legacy floor and the rearm watermark floor.
+    expect(gate.isArmed).toBe(false);
+    gate.observe(65_000);
+    expect(gate.isArmed).toBe(true);
+
+    gate.setRearmTokens(10_000);
+    gate.setWorkingContextBudget(32_000);
+    gate.request(10);
+    gate.complete(20_000, 10);
+    gate.observe(20_500);
+    expect(gate.isArmed).toBe(false);
+    gate.observe(22_000);
+    expect(gate.isArmed).toBe(true);
+  });
 });

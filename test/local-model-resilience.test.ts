@@ -130,7 +130,7 @@ describe("local-model failure injection & resilience (128k context)", () => {
   it("Scenario 1: prefill/OOM failure on first compaction backs off cleanly without wedge", async () => {
     const harness = makeHarness();
     let compactOptions: CompactOptions | undefined;
-    const context = makeContext(35_000, 64_000);
+    const context = makeContext(45_000, 64_000);
     context.compact = vi.fn((opts) => {
       compactOptions = opts;
     });
@@ -143,7 +143,7 @@ describe("local-model failure injection & resilience (128k context)", () => {
     await turnStart?.({}, context);
     await turnEnd?.({}, context);
 
-    // Threshold reached (35k >= 32k)
+    // Threshold reached (45k >= the adaptive 41.6k compact boundary)
     expect(context.compact).toHaveBeenCalledTimes(1);
     expect(compactOptions).toBeDefined();
 
@@ -168,7 +168,7 @@ describe("local-model failure injection & resilience (128k context)", () => {
   it("Scenario 2: transport termination during summary generation recovers fail-soft", async () => {
     const harness = makeHarness();
     let compactOptions: CompactOptions | undefined;
-    const context = makeContext(35_000, 64_000);
+    const context = makeContext(45_000, 64_000);
     context.compact = vi.fn((opts) => {
       compactOptions = opts;
     });
@@ -196,8 +196,8 @@ describe("local-model failure injection & resilience (128k context)", () => {
   it("Scenario 3: compaction landing above classic rearm watermark rearms on epoch growth", async () => {
     const harness = makeHarness();
     let compactCalls = 0;
-    // 64k window: threshold = 32_000, rearm watermark = 24_000
-    const context = makeContext(33_000, 64_000);
+    // 64k window: threshold = 41_600, rearm watermark = 31_200
+    const context = makeContext(45_000, 64_000);
     context.compact = vi.fn(() => {
       compactCalls += 1;
     });
@@ -209,12 +209,12 @@ describe("local-model failure injection & resilience (128k context)", () => {
     const turnEnd = harness.handlers.get("turn_end")?.[0];
     const sessionCompact = harness.handlers.get("session_compact")?.[0];
 
-    // First compaction triggered at 33k
+    // First compaction triggered at 45k
     await turnStart?.({}, context);
     await turnEnd?.({}, context);
     expect(compactCalls).toBe(1);
 
-    // Compaction finishes with postTokens = 28_000 (above 24_000 rearm watermark)
+    // Compaction finishes with postTokens = 37_000 (above the 31_200 rearm watermark)
     await sessionCompact?.(
       {
         compactionEntry: {
@@ -223,16 +223,16 @@ describe("local-model failure injection & resilience (128k context)", () => {
           parentId: null,
           summary: "summary 1",
           firstKeptEntryId: "kept-1",
-          tokensBefore: 33_000,
+          tokensBefore: 45_000,
           timestamp: new Date().toISOString(),
         },
         reason: "manual",
       },
-      makeContext(28_000, 64_000),
+      makeContext(37_000, 64_000),
     );
 
-    // Turn 2: context is 28_500 (small growth, in cooldown) -> no compaction
-    const contextTurn2 = makeContext(28_500, 64_000);
+    // Turn 2: context is 38_500 (small growth, below threshold) -> no compaction
+    const contextTurn2 = makeContext(38_500, 64_000);
     contextTurn2.compact = vi.fn(() => {
       compactCalls += 1;
     });
@@ -240,9 +240,9 @@ describe("local-model failure injection & resilience (128k context)", () => {
     await turnEnd?.({}, contextTurn2);
     expect(compactCalls).toBe(1);
 
-    // Turn 3: context grows to 32_500 (meaningful post-compaction epoch growth)
-    // Gate must NOT retire itself even though tokens never fell to <= 24k!
-    const contextTurn3 = makeContext(32_500, 64_000);
+    // Turn 3: context grows to 44_000 (meaningful post-compaction epoch growth)
+    // Gate must rearm after growth and permit the next proactive request.
+    const contextTurn3 = makeContext(44_000, 64_000);
     contextTurn3.compact = vi.fn(() => {
       compactCalls += 1;
     });
